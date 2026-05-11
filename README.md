@@ -22,6 +22,20 @@ Open `http://localhost:4173/`. Do not use `file://`, because the site fetches `g
 
 The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, lazy loading, and larger detail images only after an artwork is opened.
 
+## Desktop Uploader
+
+An experimental local Electron uploader lives in `tools/uploader`. It uploads a selected local image to Cloudinary, appends a metadata entry to `gallery.json`, and commits the JSON change back to GitHub.
+
+Run it locally:
+
+```sh
+cd tools/uploader
+npm install
+npm start
+```
+
+The uploader stores Cloudinary and GitHub credentials in Electron's local app data directory on your machine. Do not commit API secrets or GitHub tokens. The GitHub token should be a fine-grained personal access token scoped to this repository with Contents read/write access.
+
 ## `gallery.json` Fields
 
 Each artwork entry should use this shape:
