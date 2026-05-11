@@ -28,7 +28,7 @@
 
         <dl class="stats" aria-label="Gallery summary">
           <div>
-            <dt>Total</dt>
+            <dt>Items</dt>
             <dd id="statTotal">0</dd>
           </div>
           <div>
@@ -36,7 +36,7 @@
             <dd id="statFeatured">0</dd>
           </div>
           <div>
-            <dt>Available</dt>
+            <dt>Visible</dt>
             <dd id="statAvailable">0</dd>
           </div>
         </dl>
@@ -45,6 +45,10 @@
 
     <main id="gallery" class="gallery-shell">
       <section class="controls" aria-label="Gallery controls">
+        <div>
+          <p class="control-label">Gallery</p>
+          <div id="galleryFilters" class="segmented-control" role="list"></div>
+        </div>
         <div>
           <p class="control-label">Category</p>
           <div id="categoryFilters" class="segmented-control" role="list"></div>
@@ -62,6 +66,20 @@
             Add your Cloudinary cloud name in <code>assets/js/config.js</code>, then replace the
             sample public IDs in <code>gallery.json</code>. Until then, image requests are paused.
           </p>
+        </div>
+      </section>
+
+      <section id="nsfwNotice" class="notice nsfw-notice" hidden>
+        <div>
+          <p class="notice-title">Restricted gallery</p>
+          <p>
+            This section may include adult artwork. Continue only if you want to view
+            the NSFW gallery on this device.
+          </p>
+          <div class="notice-actions">
+            <button id="nsfwAccept" class="filter-button" type="button">Show NSFW Gallery</button>
+            <button id="nsfwBack" class="filter-button" type="button">Return to Main</button>
+          </div>
         </div>
       </section>
 
@@ -93,7 +111,7 @@
       <p>Static site test for Cloudinary-hosted artwork. Last updated from <code>gallery.json</code>.</p>
     </footer>
 
-    <script src="./assets/js/config.js?v=20260511-reindeer"></script>
-    <script src="./assets/js/app.js?v=20260511-reindeer"></script>
+    <script src="./assets/js/config.js?v=20260511-galleries"></script>
+    <script src="./assets/js/app.js?v=20260511-galleries"></script>
   </body>
 </html>
