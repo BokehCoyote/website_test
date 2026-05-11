@@ -26,7 +26,7 @@ The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, l
 
 An experimental local Electron uploader lives in `tools/uploader`. It uploads a selected local image to Cloudinary, appends a metadata entry to `gallery.json`, and commits the JSON change back to GitHub.
 
-Run it locally:
+Run it from Finder by double-clicking `Open Gallery Uploader.command`, or run it locally:
 
 ```sh
 cd tools/uploader
@@ -44,12 +44,8 @@ Each artwork entry should use this shape:
 {
   "id": "night-window-2026",
   "title": "Night Window",
-  "year": "2026",
-  "medium": "Digital painting",
-  "dimensions": "3000 x 2400 px",
   "gallery": "Main",
-  "category": "paintings",
-  "status": "available",
+  "uploadedAt": "2026-05-11",
   "alt": "Digital painting of a lit window at night",
   "cloudinaryPublicId": "portfolio/paintings/night-window-2026",
   "featured": true
