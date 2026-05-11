@@ -34,4 +34,4 @@ npm start
 4. Click Upload and Commit.
 5. GitHub Pages republishes after the commit lands on `main`.
 
-The `gallery` field controls site sorting. Cloudinary folders are only an organizational convenience.
+The uploader writes `uploadedAt` automatically using the upload date. The `gallery` field controls site sorting. Cloudinary folders are only an organizational convenience.
