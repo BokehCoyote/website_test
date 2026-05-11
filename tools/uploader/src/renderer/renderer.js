@@ -34,7 +34,13 @@ function formatBytes(bytes) {
 }
 
 function toSlug(value) {
-  return String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 }
 
 function setFormFromSettings(nextSettings) {
@@ -42,12 +48,14 @@ function setFormFromSettings(nextSettings) {
   $("#apiKey").value = nextSettings.cloudinary.apiKey === "saved" ? "" : nextSettings.cloudinary.apiKey || "";
   $("#apiSecret").value = "";
   $("#apiSecret").placeholder = nextSettings.cloudinary.apiSecret === "saved" ? "Saved locally" : "";
+
   $("#owner").value = nextSettings.github.owner || "";
   $("#repo").value = nextSettings.github.repo || "";
   $("#branch").value = nextSettings.github.branch || "";
   $("#galleryPath").value = nextSettings.github.galleryPath || "";
   $("#token").value = "";
   $("#token").placeholder = nextSettings.github.token === "saved" ? "Saved locally" : "";
+
   $("#folderMain").value = nextSettings.cloudinaryFolders.Main || "Main";
   $("#folderExperimental").value = nextSettings.cloudinaryFolders.Experimental || "Experimental";
   $("#folderNsfw").value = nextSettings.cloudinaryFolders.NSFW || "NSFW";
@@ -86,11 +94,6 @@ function readArtworkForm() {
     title,
     id: $("#id").value.trim() || toSlug(`${$("#gallery").value}-${title}`),
     gallery: $("#gallery").value,
-    category: $("#category").value.trim(),
-    status: $("#status").value,
-    year: $("#year").value.trim(),
-    medium: $("#medium").value.trim(),
-    dimensions: $("#dimensions").value.trim(),
     alt: $("#alt").value.trim() || title,
     featured: $("#featured").checked,
     publicId: $("#publicId").value.trim()
@@ -101,6 +104,7 @@ elements.settingsToggle.addEventListener("click", () => {
   setFormFromSettings(settings);
   elements.settingsDialog.showModal();
 });
+
 elements.closeSettings.addEventListener("click", () => elements.settingsDialog.close());
 elements.cancelSettings.addEventListener("click", () => elements.settingsDialog.close());
 
@@ -119,23 +123,34 @@ elements.settingsForm.addEventListener("submit", async (event) => {
 elements.chooseImage.addEventListener("click", async () => {
   const file = await window.galleryUploader.chooseImage();
   if (!file) return;
+
   selectedFile = file;
   elements.fileSummary.textContent = `${file.name} - ${formatBytes(file.size)}`;
+
   const title = $("#title");
-  if (!title.value) title.value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+  if (!title.value) {
+    title.value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+  }
 });
 
 elements.artworkForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+
   if (!selectedFile) {
     log("Choose an image before uploading.", "error");
     return;
   }
+
   elements.submitButton.disabled = true;
   elements.submitButton.textContent = "Uploading...";
   log("Uploading image to Cloudinary.");
+
   try {
-    const result = await window.galleryUploader.uploadArtwork({ filePath: selectedFile.path, artwork: readArtworkForm() });
+    const result = await window.galleryUploader.uploadArtwork({
+      filePath: selectedFile.path,
+      artwork: readArtworkForm()
+    });
+
     elements.result.hidden = false;
     elements.resultPublicId.textContent = result.cloudinary.publicId;
     elements.resultCommit.textContent = result.github.commitSha || "View commit";
@@ -149,4 +164,6 @@ elements.artworkForm.addEventListener("submit", async (event) => {
   }
 });
 
-loadSettings().then(() => log("Uploader ready."));
+loadSettings().then(() => {
+  log("Uploader ready.");
+});
