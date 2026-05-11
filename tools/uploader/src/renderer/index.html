@@ -60,6 +60,19 @@
 
           <button class="primary span-2" id="submitButton" type="submit">Upload and Commit</button>
         </form>
+
+        <section class="manager" aria-labelledby="manageTitle">
+          <div class="section-head">
+            <div>
+              <h2 id="manageTitle">Manage Posts</h2>
+              <p>Hide posts from the site without deleting Cloudinary assets.</p>
+            </div>
+            <button class="secondary" id="refreshPosts" type="button">Refresh</button>
+          </div>
+          <div id="postList" class="post-list" aria-live="polite">
+            <p class="muted">Refresh after Settings are saved.</p>
+          </div>
+        </section>
       </section>
 
       <aside class="panel status-panel">

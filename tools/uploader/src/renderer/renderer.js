@@ -13,6 +13,8 @@ const elements = {
   fileSummary: $("#fileSummary"),
   artworkForm: $("#artworkForm"),
   submitButton: $("#submitButton"),
+  refreshPosts: $("#refreshPosts"),
+  postList: $("#postList"),
   statusLog: $("#statusLog"),
   result: $("#result"),
   resultPublicId: $("#resultPublicId"),
@@ -100,6 +102,83 @@ function readArtworkForm() {
   };
 }
 
+function renderPosts(posts) {
+  elements.postList.replaceChildren();
+
+  if (!posts.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No posts found in gallery.json.";
+    elements.postList.append(empty);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  posts.forEach((post) => fragment.append(createPostRow(post)));
+  elements.postList.append(fragment);
+}
+
+function createPostRow(post) {
+  const row = document.createElement("article");
+  row.className = `post-row${post.hidden ? " is-hidden" : ""}`;
+
+  const details = document.createElement("div");
+  details.className = "post-details";
+
+  const title = document.createElement("strong");
+  title.textContent = post.title || post.id;
+
+  const meta = document.createElement("span");
+  meta.textContent = [post.gallery, post.uploadedAt, post.hidden ? "Hidden" : "Visible"].filter(Boolean).join(" - ");
+
+  const publicId = document.createElement("small");
+  publicId.textContent = post.cloudinaryPublicId || post.id;
+
+  details.append(title, meta, publicId);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = post.hidden ? "secondary" : "danger";
+  button.textContent = post.hidden ? "Restore" : "Hide";
+  button.addEventListener("click", () => setPostHidden(post.id, !post.hidden, post.title || post.id));
+
+  row.append(details, button);
+  return row;
+}
+
+async function loadPosts() {
+  elements.refreshPosts.disabled = true;
+  elements.refreshPosts.textContent = "Loading...";
+
+  try {
+    const posts = await window.galleryUploader.listArtwork();
+    renderPosts(posts);
+    log(`Loaded ${posts.length} posts.`);
+  } catch (error) {
+    log(error.message, "error");
+  } finally {
+    elements.refreshPosts.disabled = false;
+    elements.refreshPosts.textContent = "Refresh";
+  }
+}
+
+async function setPostHidden(id, hidden, title) {
+  const verb = hidden ? "hide" : "restore";
+  const confirmed = window.confirm(`${verb === "hide" ? "Hide" : "Restore"} "${title}"?`);
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const result = await window.galleryUploader.setArtworkHidden({ id, hidden });
+    log(`${hidden ? "Hidden" : "Restored"} ${result.item.title}.`, "success");
+    await loadPosts();
+  } catch (error) {
+    log(error.message, "error");
+  }
+}
+
 elements.settingsToggle.addEventListener("click", () => {
   setFormFromSettings(settings);
   elements.settingsDialog.showModal();
@@ -119,6 +198,8 @@ elements.settingsForm.addEventListener("submit", async (event) => {
     log(error.message, "error");
   }
 });
+
+elements.refreshPosts.addEventListener("click", loadPosts);
 
 elements.chooseImage.addEventListener("click", async () => {
   const file = await window.galleryUploader.chooseImage();
@@ -156,6 +237,7 @@ elements.artworkForm.addEventListener("submit", async (event) => {
     elements.resultCommit.textContent = result.github.commitSha || "View commit";
     elements.resultCommit.href = result.github.htmlUrl || "#";
     log(`Committed ${result.entry.title} to gallery.json.`, "success");
+    await loadPosts();
   } catch (error) {
     log(error.message, "error");
   } finally {

@@ -186,7 +186,7 @@ async function fetchGallery(settings) {
   return { file, gallery, encodedPath };
 }
 
-async function commitGallery(settings, encodedPath, sha, gallery, entry) {
+async function commitGallery(settings, encodedPath, sha, gallery, message) {
   const { owner, repo, branch } = settings.github;
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
   const content = Buffer.from(`${JSON.stringify(gallery, null, 2)}\n`, "utf8").toString("base64");
@@ -196,7 +196,7 @@ async function commitGallery(settings, encodedPath, sha, gallery, entry) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      message: `Add ${entry.title} to gallery`,
+      message,
       content,
       sha,
       branch
@@ -329,7 +329,7 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
 
   const entry = toGalleryEntry(artwork, uploadResult);
   const nextGallery = [...gallery, entry];
-  const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, entry);
+  const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `Add ${entry.title} to gallery`);
 
   return {
     entry,
@@ -340,6 +340,74 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
       height: uploadResult.height,
       bytes: uploadResult.bytes,
       format: uploadResult.format
+    },
+    github: {
+      commitSha: commit.commit?.sha,
+      htmlUrl: commit.commit?.html_url || commit.content?.html_url
+    }
+  };
+});
+
+ipcMain.handle("artwork:list", async () => {
+  const settings = await readSettings();
+
+  requireValue(settings.github.owner, "GitHub owner");
+  requireValue(settings.github.repo, "GitHub repo");
+  requireValue(settings.github.branch, "GitHub branch");
+  requireValue(settings.github.galleryPath, "GitHub gallery path");
+  requireValue(settings.github.token, "GitHub token");
+
+  const { gallery } = await fetchGallery(settings);
+  return gallery.map((item) => ({
+    id: item.id,
+    title: item.title || item.id,
+    gallery: item.gallery || "Main",
+    uploadedAt: item.uploadedAt || "",
+    cloudinaryPublicId: item.cloudinaryPublicId || "",
+    hidden: Boolean(item.hidden)
+  }));
+});
+
+ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
+  const settings = await readSettings();
+  const id = payload?.id;
+  const hidden = Boolean(payload?.hidden);
+
+  requireValue(id, "Artwork ID");
+  requireValue(settings.github.owner, "GitHub owner");
+  requireValue(settings.github.repo, "GitHub repo");
+  requireValue(settings.github.branch, "GitHub branch");
+  requireValue(settings.github.galleryPath, "GitHub gallery path");
+  requireValue(settings.github.token, "GitHub token");
+
+  const { file, gallery, encodedPath } = await fetchGallery(settings);
+  const index = gallery.findIndex((item) => item.id === id);
+
+  if (index === -1) {
+    throw new Error(`gallery.json does not contain id "${id}".`);
+  }
+
+  const item = gallery[index];
+  const nextItem = { ...item };
+
+  if (hidden) {
+    nextItem.hidden = true;
+  } else {
+    delete nextItem.hidden;
+  }
+
+  const nextGallery = gallery.map((entry, entryIndex) => (entryIndex === index ? nextItem : entry));
+  const action = hidden ? "Hide" : "Restore";
+  const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `${action} ${item.title || id}`);
+
+  return {
+    item: {
+      id: nextItem.id,
+      title: nextItem.title || nextItem.id,
+      gallery: nextItem.gallery || "Main",
+      uploadedAt: nextItem.uploadedAt || "",
+      cloudinaryPublicId: nextItem.cloudinaryPublicId || "",
+      hidden: Boolean(nextItem.hidden)
     },
     github: {
       commitSha: commit.commit?.sha,

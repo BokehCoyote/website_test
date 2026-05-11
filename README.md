@@ -54,6 +54,8 @@ Each artwork entry should use this shape:
 
 Keep full artwork files out of GitHub. GitHub should store only the website files and metadata.
 
+Set `"hidden": true` to hide an entry from the public site without deleting the Cloudinary asset. The desktop uploader can add or remove this flag from Manage Posts.
+
 Supported gallery values are `Main`, `Experimental`, and `NSFW`. Cloudinary folders can mirror those names for organization, but sorting on the website comes from the explicit `gallery` field in `gallery.json`.
 
 The NSFW gallery is hidden behind an in-page warning and its images are not inserted into the DOM until the warning is accepted. This is a presentation safeguard, not real access control: public Cloudinary delivery URLs remain public to anyone who has the URL.

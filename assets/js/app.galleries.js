@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260511-slim-uploader";
+  const ASSET_VERSION = "20260511-hide-posts";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -51,7 +51,7 @@
 
     try {
       const data = await fetchGallery();
-      state.artworks = data.map(normalizeArtwork).sort(sortArtwork);
+      state.artworks = data.filter((item) => !item.hidden).map(normalizeArtwork).sort(sortArtwork);
       renderAll();
     } catch (error) {
       renderError(error);
@@ -263,6 +263,16 @@
     return image;
   }
 
+  function createDetail(label, value) {
+    const wrapper = document.createElement("div");
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+    term.textContent = label;
+    detail.textContent = value;
+    wrapper.append(term, detail);
+    return wrapper;
+  }
+
   function createImagePlaceholder(message) {
     const placeholder = document.createElement("div");
     placeholder.className = "image-placeholder";
@@ -315,6 +325,7 @@
     if (!galleryKeys.has(state.gallery)) {
       state.gallery = DEFAULT_GALLERY;
     }
+
   }
 
   function sortArtwork(a, b) {
