@@ -4,15 +4,43 @@ const fs = require("fs/promises");
 const { v2: cloudinary } = require("cloudinary");
 
 const DEFAULT_SETTINGS = {
-  cloudinary: { cloudName: "dvv9rmejs", apiKey: "", apiSecret: "" },
-  github: { owner: "BokehCoyote", repo: "website_test", branch: "main", galleryPath: "gallery.json", token: "" },
-  cloudinaryFolders: { Main: "Main", Experimental: "Experimental", NSFW: "NSFW" }
+  cloudinary: {
+    cloudName: "dvv9rmejs",
+    apiKey: "",
+    apiSecret: ""
+  },
+  github: {
+    owner: "BokehCoyote",
+    repo: "website_test",
+    branch: "main",
+    galleryPath: "gallery.json",
+    token: ""
+  },
+  cloudinaryFolders: {
+    Main: "Main",
+    Experimental: "Experimental",
+    NSFW: "NSFW"
+  }
 };
 
 const PUBLIC_SETTINGS = {
-  cloudinary: { cloudName: true, apiKey: true, apiSecret: false },
-  github: { owner: true, repo: true, branch: true, galleryPath: true, token: false },
-  cloudinaryFolders: { Main: true, Experimental: true, NSFW: true }
+  cloudinary: {
+    cloudName: true,
+    apiKey: true,
+    apiSecret: false
+  },
+  github: {
+    owner: true,
+    repo: true,
+    branch: true,
+    galleryPath: true,
+    token: false
+  },
+  cloudinaryFolders: {
+    Main: true,
+    Experimental: true,
+    NSFW: true
+  }
 };
 
 function settingsPath() {
@@ -36,7 +64,9 @@ async function readSettings() {
     const raw = await fs.readFile(settingsPath(), "utf8");
     return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
   } catch (error) {
-    if (error.code === "ENOENT") return DEFAULT_SETTINGS;
+    if (error.code === "ENOENT") {
+      return DEFAULT_SETTINGS;
+    }
     throw error;
   }
 }
@@ -52,17 +82,24 @@ function redactSettings(settings) {
   function redactObject(value, mask) {
     const out = {};
     for (const [key, rule] of Object.entries(mask)) {
-      if (rule === true) out[key] = value?.[key] || "";
-      else if (rule === false) out[key] = value?.[key] ? "saved" : "";
-      else out[key] = redactObject(value?.[key] || {}, rule);
+      if (rule === true) {
+        out[key] = value?.[key] || "";
+      } else if (rule === false) {
+        out[key] = value?.[key] ? "saved" : "";
+      } else {
+        out[key] = redactObject(value?.[key] || {}, rule);
+      }
     }
     return out;
   }
+
   return redactObject(settings, PUBLIC_SETTINGS);
 }
 
 function requireValue(value, label) {
-  if (!String(value || "").trim()) throw new Error(`${label} is required.`);
+  if (!String(value || "").trim()) {
+    throw new Error(`${label} is required.`);
+  }
 }
 
 function slugify(value) {
@@ -76,27 +113,30 @@ function slugify(value) {
 }
 
 function cleanSegment(value) {
-  return String(value || "").trim().replace(/^\/+|\/+$/g, "").replace(/[?#\\%<>+]+/g, "-");
+  return String(value || "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/[?#\\%<>+]+/g, "-");
 }
 
 function buildPublicId(settings, artwork, filePath) {
   const gallery = artwork.gallery || "Main";
   const folder = cleanSegment(settings.cloudinaryFolders?.[gallery] || gallery);
   const base = slugify(artwork.publicId || artwork.id || artwork.title || path.basename(filePath, path.extname(filePath)));
-  if (!base) throw new Error("A title or public ID is required to name the Cloudinary asset.");
+  if (!base) {
+    throw new Error("A title or public ID is required to name the Cloudinary asset.");
+  }
   return folder ? `${folder}/${base}` : base;
 }
 
 function toGalleryEntry(artwork, uploadResult) {
+  const uploadedAt = new Date().toISOString().slice(0, 10);
+
   return {
     id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
     title: artwork.title,
-    year: artwork.year || new Date().getFullYear().toString(),
-    medium: artwork.medium || "Digital artwork",
-    dimensions: artwork.dimensions || `${uploadResult.width} x ${uploadResult.height} px`,
     gallery: artwork.gallery || "Main",
-    category: artwork.category || "artwork",
-    status: artwork.status || "available",
+    uploadedAt,
     alt: artwork.alt || artwork.title,
     cloudinaryPublicId: uploadResult.public_id,
     featured: Boolean(artwork.featured)
@@ -114,12 +154,22 @@ async function githubRequest(settings, url, options = {}) {
       ...(options.headers || {})
     }
   });
+
   const text = await response.text();
   let body = null;
   if (text) {
-    try { body = JSON.parse(text); } catch { body = text; }
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
   }
-  if (!response.ok) throw new Error(`GitHub ${response.status}: ${body?.message || response.statusText}`);
+
+  if (!response.ok) {
+    const message = body?.message || response.statusText;
+    throw new Error(`GitHub ${response.status}: ${message}`);
+  }
+
   return body;
 }
 
@@ -130,7 +180,9 @@ async function fetchGallery(settings) {
   const file = await githubRequest(settings, url);
   const content = Buffer.from(file.content || "", "base64").toString("utf8");
   const gallery = JSON.parse(content);
-  if (!Array.isArray(gallery)) throw new Error(`${galleryPath} must contain a JSON array.`);
+  if (!Array.isArray(gallery)) {
+    throw new Error(`${galleryPath} must contain a JSON array.`);
+  }
   return { file, gallery, encodedPath };
 }
 
@@ -140,8 +192,15 @@ async function commitGallery(settings, encodedPath, sha, gallery, entry) {
   const content = Buffer.from(`${JSON.stringify(gallery, null, 2)}\n`, "utf8").toString("base64");
   return githubRequest(settings, url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: `Add ${entry.title} to gallery`, content, sha, branch })
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: `Add ${entry.title} to gallery`,
+      content,
+      sha,
+      branch
+    })
   });
 }
 
@@ -158,20 +217,39 @@ async function createWindow() {
       nodeIntegration: false
     }
   });
+
   await win.loadFile(path.join(__dirname, "renderer", "index.html"));
 }
 
 app.whenReady().then(createWindow);
-app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
-app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
-ipcMain.handle("settings:load", async () => redactSettings(await readSettings()));
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+ipcMain.handle("settings:load", async () => {
+  return redactSettings(await readSettings());
+});
 
 ipcMain.handle("settings:save", async (_event, incoming) => {
   const current = await readSettings();
   const next = deepMerge(current, incoming);
-  if (incoming?.cloudinary?.apiSecret === "saved") next.cloudinary.apiSecret = current.cloudinary.apiSecret;
-  if (incoming?.github?.token === "saved") next.github.token = current.github.token;
+
+  if (incoming?.cloudinary?.apiSecret === "saved") {
+    next.cloudinary.apiSecret = current.cloudinary.apiSecret;
+  }
+  if (incoming?.github?.token === "saved") {
+    next.github.token = current.github.token;
+  }
+
   return redactSettings(await writeSettings(next));
 });
 
@@ -179,12 +257,22 @@ ipcMain.handle("image:choose", async () => {
   const result = await dialog.showOpenDialog({
     title: "Choose optimized artwork image",
     properties: ["openFile"],
-    filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "avif", "tif", "tiff"] }]
+    filters: [
+      { name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "avif", "tif", "tiff"] }
+    ]
   });
-  if (result.canceled || !result.filePaths.length) return null;
+
+  if (result.canceled || !result.filePaths.length) {
+    return null;
+  }
+
   const filePath = result.filePaths[0];
   const stat = await fs.stat(filePath);
-  return { path: filePath, name: path.basename(filePath), size: stat.size };
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    size: stat.size
+  };
 });
 
 ipcMain.handle("artwork:upload", async (_event, payload) => {
@@ -212,10 +300,18 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
   });
 
   const publicId = buildPublicId(settings, artwork, filePath);
-  const entryDraft = { id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`), cloudinaryPublicId: publicId };
+  const entryDraft = {
+    id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
+    cloudinaryPublicId: publicId
+  };
   const { file, gallery, encodedPath } = await fetchGallery(settings);
-  if (gallery.some((item) => item.id === entryDraft.id)) throw new Error(`gallery.json already contains id "${entryDraft.id}". Use a unique title or custom ID.`);
-  if (gallery.some((item) => item.cloudinaryPublicId === entryDraft.cloudinaryPublicId)) throw new Error(`gallery.json already contains public ID "${entryDraft.cloudinaryPublicId}".`);
+
+  if (gallery.some((item) => item.id === entryDraft.id)) {
+    throw new Error(`gallery.json already contains id "${entryDraft.id}". Use a unique title or custom ID.`);
+  }
+  if (gallery.some((item) => item.cloudinaryPublicId === entryDraft.cloudinaryPublicId)) {
+    throw new Error(`gallery.json already contains public ID "${entryDraft.cloudinaryPublicId}".`);
+  }
 
   const uploadResult = await cloudinary.uploader.upload(filePath, {
     resource_type: "image",
@@ -223,12 +319,18 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
     overwrite: false,
     use_filename: false,
     unique_filename: false,
-    tags: ["portfolio", artwork.gallery, artwork.category || "artwork"].filter(Boolean),
-    context: { title: artwork.title, alt: artwork.alt || artwork.title, gallery: artwork.gallery }
+    tags: ["portfolio", artwork.gallery].filter(Boolean),
+    context: {
+      title: artwork.title,
+      alt: artwork.alt || artwork.title,
+      gallery: artwork.gallery
+    }
   });
 
   const entry = toGalleryEntry(artwork, uploadResult);
-  const commit = await commitGallery(settings, encodedPath, file.sha, [...gallery, entry], entry);
+  const nextGallery = [...gallery, entry];
+  const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, entry);
+
   return {
     entry,
     cloudinary: {
@@ -239,6 +341,9 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
       bytes: uploadResult.bytes,
       format: uploadResult.format
     },
-    github: { commitSha: commit.commit?.sha, htmlUrl: commit.commit?.html_url || commit.content?.html_url }
+    github: {
+      commitSha: commit.commit?.sha,
+      htmlUrl: commit.commit?.html_url || commit.content?.html_url
+    }
   };
 });
