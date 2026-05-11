@@ -1,6 +1,6 @@
 # Bokeh Coyote Gallery Test
 
-Testing with Codex to see how the portfolio might work. This is a plain static GitHub Pages gallery for an art portfolio workflow with Cloudinary-hosted images and local JSON metadata.
+Plain static GitHub Pages gallery for testing an art portfolio workflow with Cloudinary-hosted images and local JSON metadata.
 
 ## Local Preview
 
@@ -33,6 +33,7 @@ Each artwork entry should use this shape:
   "year": "2026",
   "medium": "Digital painting",
   "dimensions": "3000 x 2400 px",
+  "gallery": "Main",
   "category": "paintings",
   "status": "available",
   "alt": "Digital painting of a lit window at night",
@@ -42,6 +43,10 @@ Each artwork entry should use this shape:
 ```
 
 Keep full artwork files out of GitHub. GitHub should store only the website files and metadata.
+
+Supported gallery values are `Main`, `Experimental`, and `NSFW`. Cloudinary folders can mirror those names for organization, but sorting on the website comes from the explicit `gallery` field in `gallery.json`.
+
+The NSFW gallery is hidden behind an in-page warning and its images are not inserted into the DOM until the warning is accepted. This is a presentation safeguard, not real access control: public Cloudinary delivery URLs remain public to anyone who has the URL.
 
 ## GitHub Pages Deployment
 
