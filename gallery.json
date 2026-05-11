@@ -1,14 +1,14 @@
 [
   {
-    "id": "night-window-2026",
-    "title": "Night Window",
+    "id": "reindeer-test-image",
+    "title": "Reindeer Test Image",
     "year": "2026",
-    "medium": "Digital painting",
-    "dimensions": "3000 x 2400 px",
-    "category": "paintings",
+    "medium": "Cloudinary test image",
+    "dimensions": "Cloudinary sample asset",
+    "category": "test-images",
     "status": "available",
-    "alt": "Digital painting of a lit window at night",
-    "cloudinaryPublicId": "portfolio/paintings/night-window-2026",
+    "alt": "Reindeer standing in snow",
+    "cloudinaryPublicId": "samples/animals/reindeer",
     "featured": true
   },
   {
