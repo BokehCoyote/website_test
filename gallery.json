@@ -1,0 +1,38 @@
+[
+  {
+    "id": "night-window-2026",
+    "title": "Night Window",
+    "year": "2026",
+    "medium": "Digital painting",
+    "dimensions": "3000 x 2400 px",
+    "category": "paintings",
+    "status": "available",
+    "alt": "Digital painting of a lit window at night",
+    "cloudinaryPublicId": "portfolio/paintings/night-window-2026",
+    "featured": true
+  },
+  {
+    "id": "paper-moon-study",
+    "title": "Paper Moon Study",
+    "year": "2025",
+    "medium": "Mixed media study",
+    "dimensions": "18 x 24 in",
+    "category": "studies",
+    "status": "archive",
+    "alt": "Layered study of a pale moon over cut paper shapes",
+    "cloudinaryPublicId": "portfolio/studies/paper-moon-study",
+    "featured": false
+  },
+  {
+    "id": "signal-bloom",
+    "title": "Signal Bloom",
+    "year": "2026",
+    "medium": "Digital painting",
+    "dimensions": "2400 x 3000 px",
+    "category": "paintings",
+    "status": "available",
+    "alt": "Abstract bloom of red light against a dark field",
+    "cloudinaryPublicId": "portfolio/paintings/signal-bloom",
+    "featured": true
+  }
+]
