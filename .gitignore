@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+
+# Local uploader credentials and packaged builds.
+tools/uploader/.env
+tools/uploader/.env.local
+tools/uploader/dist/
+tools/uploader/out/
