@@ -133,5 +133,14 @@
     "alt": "bigcat",
     "cloudinaryPublicId": "Experimental/experimental-bigcat",
     "featured": false
+  },
+  {
+    "id": "main-bigcat",
+    "title": "bigcat",
+    "gallery": "Main",
+    "uploadedAt": "2026-05-11",
+    "alt": "bigcat",
+    "cloudinaryPublicId": "Main/main-bigcat",
+    "featured": false
   }
 ]
