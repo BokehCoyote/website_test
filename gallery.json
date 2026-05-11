@@ -12,27 +12,39 @@
     "featured": true
   },
   {
-    "id": "paper-moon-study",
-    "title": "Paper Moon Study",
-    "year": "2025",
-    "medium": "Mixed media study",
-    "dimensions": "18 x 24 in",
-    "category": "studies",
-    "status": "archive",
-    "alt": "Layered study of a pale moon over cut paper shapes",
-    "cloudinaryPublicId": "portfolio/studies/paper-moon-study",
+    "id": "kitten-playing-test-image",
+    "title": "Kitten Playing Test Image",
+    "year": "2026",
+    "medium": "Cloudinary test image",
+    "dimensions": "Cloudinary sample asset",
+    "category": "test-images",
+    "status": "available",
+    "alt": "Kitten playing",
+    "cloudinaryPublicId": "samples/animals/kitten-playing",
+    "featured": true
+  },
+  {
+    "id": "three-dogs-test-image",
+    "title": "Three Dogs Test Image",
+    "year": "2026",
+    "medium": "Cloudinary test image",
+    "dimensions": "Cloudinary sample asset",
+    "category": "test-images",
+    "status": "available",
+    "alt": "Three dogs together",
+    "cloudinaryPublicId": "samples/animals/three-dogs",
     "featured": false
   },
   {
-    "id": "signal-bloom",
-    "title": "Signal Bloom",
+    "id": "cat-test-image",
+    "title": "Cat Test Image",
     "year": "2026",
-    "medium": "Digital painting",
-    "dimensions": "2400 x 3000 px",
-    "category": "paintings",
+    "medium": "Cloudinary test image",
+    "dimensions": "Cloudinary sample asset",
+    "category": "test-images",
     "status": "available",
-    "alt": "Abstract bloom of red light against a dark field",
-    "cloudinaryPublicId": "portfolio/paintings/signal-bloom",
-    "featured": true
+    "alt": "Cat portrait",
+    "cloudinaryPublicId": "samples/animals/cat",
+    "featured": false
   }
 ]
