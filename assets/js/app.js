@@ -1,4 +1,12 @@
 (function () {
+  const ASSET_VERSION = "20260511-galleries";
+  const DEFAULT_GALLERY = "main";
+  const NSFW_GALLERY = "nsfw";
+  const GALLERY_OPTIONS = [
+    { key: "main", label: "Main" },
+    { key: "experimental", label: "Experimental" },
+    { key: "nsfw", label: "NSFW" }
+  ];
   const PLACEHOLDER_CLOUD_NAMES = new Set([
     "",
     "replace-with-your-cloud-name",
@@ -8,8 +16,10 @@
 
   const state = {
     artworks: [],
+    gallery: DEFAULT_GALLERY,
     category: "all",
     status: "all",
+    nsfwAccepted: false,
     activeArtworkId: null
   };
 
@@ -17,9 +27,13 @@
     total: document.querySelector("#statTotal"),
     featured: document.querySelector("#statFeatured"),
     available: document.querySelector("#statAvailable"),
+    galleryFilters: document.querySelector("#galleryFilters"),
     categoryFilters: document.querySelector("#categoryFilters"),
     statusFilters: document.querySelector("#statusFilters"),
     setupNotice: document.querySelector("#setupNotice"),
+    nsfwNotice: document.querySelector("#nsfwNotice"),
+    nsfwAccept: document.querySelector("#nsfwAccept"),
+    nsfwBack: document.querySelector("#nsfwBack"),
     errorNotice: document.querySelector("#errorNotice"),
     grid: document.querySelector("#galleryGrid"),
     emptyState: document.querySelector("#emptyState"),
@@ -37,6 +51,7 @@
 
   async function init() {
     wireDialog();
+    wireNsfwNotice();
 
     try {
       const data = await fetchGallery();
@@ -48,7 +63,7 @@
   }
 
   async function fetchGallery() {
-    const response = await fetch("./gallery.json", { cache: "no-store" });
+    const response = await fetch(`./gallery.json?v=${ASSET_VERSION}`, { cache: "no-store" });
 
     if (!response.ok) {
       throw new Error(`Unable to load gallery.json (${response.status}).`);
@@ -66,6 +81,7 @@
   function normalizeArtwork(item, index) {
     const title = cleanText(item.title, `Untitled ${index + 1}`);
     const id = cleanText(item.id, slugify(title) || `artwork-${index + 1}`);
+    const gallery = cleanText(item.gallery, DEFAULT_GALLERY);
     const category = cleanText(item.category, "uncategorized");
     const status = cleanText(item.status, "unknown");
 
@@ -75,6 +91,8 @@
       year: cleanText(item.year, "Undated"),
       medium: cleanText(item.medium, "Medium not listed"),
       dimensions: cleanText(item.dimensions, "Dimensions not listed"),
+      gallery,
+      galleryKey: slugify(gallery) || DEFAULT_GALLERY,
       category,
       categoryKey: slugify(category),
       status,
@@ -86,16 +104,17 @@
   }
 
   function renderAll() {
-    renderStats();
+    ensureValidFilters();
     renderSetupNotice();
     renderFilters();
     renderGallery();
   }
 
-  function renderStats() {
-    elements.total.textContent = state.artworks.length;
-    elements.featured.textContent = state.artworks.filter((item) => item.featured).length;
-    elements.available.textContent = state.artworks.filter((item) => item.statusKey === "available").length;
+  function renderStats(filteredItems) {
+    const galleryItems = getActiveGalleryItems();
+    elements.total.textContent = galleryItems.length;
+    elements.featured.textContent = galleryItems.filter((item) => item.featured).length;
+    elements.available.textContent = filteredItems.length;
   }
 
   function renderSetupNotice() {
@@ -103,13 +122,17 @@
   }
 
   function renderFilters() {
-    renderFilterGroup(elements.categoryFilters, "category", getFilterOptions("category"));
-    renderFilterGroup(elements.statusFilters, "status", getFilterOptions("status"));
+    renderFilterGroup(elements.galleryFilters, "gallery", GALLERY_OPTIONS, false);
+    renderFilterGroup(elements.categoryFilters, "category", getFilterOptions("category"), true);
+    renderFilterGroup(elements.statusFilters, "status", getFilterOptions("status"), true);
   }
 
-  function renderFilterGroup(container, filterName, options) {
+  function renderFilterGroup(container, filterName, options, includeAll) {
     container.replaceChildren();
-    container.append(createFilterButton(filterName, "all", "All", state[filterName] === "all"));
+
+    if (includeAll) {
+      container.append(createFilterButton(filterName, "all", "All", state[filterName] === "all"));
+    }
 
     options.forEach((option) => {
       container.append(createFilterButton(filterName, option.key, option.label, state[filterName] === option.key));
@@ -126,22 +149,29 @@
     button.textContent = label;
     button.addEventListener("click", () => {
       state[filterName] = value;
-      renderFilters();
-      renderGallery();
+
+      if (filterName === "gallery") {
+        state.category = "all";
+        state.status = "all";
+      }
+
+      renderAll();
     });
     return button;
   }
 
   function renderGallery() {
-    const filtered = state.artworks.filter((item) => {
-      return (
-        (state.category === "all" || item.categoryKey === state.category) &&
-        (state.status === "all" || item.statusKey === state.status)
-      );
-    });
+    const nsfwLocked = isNsfwLocked();
+    const filtered = nsfwLocked ? [] : getFilteredArtworks();
 
+    elements.nsfwNotice.hidden = !nsfwLocked;
     elements.grid.replaceChildren();
-    elements.emptyState.hidden = filtered.length > 0;
+    elements.emptyState.hidden = nsfwLocked || filtered.length > 0;
+    renderStats(filtered);
+
+    if (nsfwLocked) {
+      return;
+    }
 
     const fragment = document.createDocumentFragment();
     filtered.forEach((artwork) => fragment.append(createArtworkCard(artwork)));
@@ -171,6 +201,7 @@
       </div>
       <p>${escapeHtml(artwork.medium)}</p>
       <div class="card-meta">
+        <span>${escapeHtml(artwork.gallery)}</span>
         <span>${escapeHtml(artwork.category)}</span>
         <span>${escapeHtml(artwork.status)}</span>
       </div>
@@ -214,13 +245,13 @@
   function openArtwork(id) {
     const artwork = state.artworks.find((item) => item.id === id);
 
-    if (!artwork) {
+    if (!artwork || (artwork.galleryKey === NSFW_GALLERY && !state.nsfwAccepted)) {
       return;
     }
 
     state.activeArtworkId = id;
     elements.dialogTitle.textContent = artwork.title;
-    elements.dialogMeta.textContent = `${artwork.category} / ${artwork.year}`;
+    elements.dialogMeta.textContent = `${artwork.gallery} / ${artwork.category} / ${artwork.year}`;
     elements.dialogAlt.textContent = artwork.alt;
     elements.dialogDetails.replaceChildren(
       createDetail("Medium", artwork.medium),
@@ -286,6 +317,19 @@
     });
   }
 
+  function wireNsfwNotice() {
+    elements.nsfwAccept.addEventListener("click", () => {
+      state.nsfwAccepted = true;
+      renderAll();
+    });
+    elements.nsfwBack.addEventListener("click", () => {
+      state.gallery = DEFAULT_GALLERY;
+      state.category = "all";
+      state.status = "all";
+      renderAll();
+    });
+  }
+
   function renderError(error) {
     elements.errorNotice.hidden = false;
     elements.errorNotice.textContent = error.message;
@@ -298,7 +342,7 @@
     const labelKey = type;
     const valueKey = `${type}Key`;
 
-    state.artworks.forEach((item) => {
+    getActiveGalleryItems().forEach((item) => {
       if (!map.has(item[valueKey])) {
         map.set(item[valueKey], item[labelKey]);
       }
@@ -309,7 +353,43 @@
     });
   }
 
+  function getActiveGalleryItems() {
+    return state.artworks.filter((item) => item.galleryKey === state.gallery);
+  }
+
+  function getFilteredArtworks() {
+    return getActiveGalleryItems().filter((item) => {
+      return (
+        (state.category === "all" || item.categoryKey === state.category) &&
+        (state.status === "all" || item.statusKey === state.status)
+      );
+    });
+  }
+
+  function ensureValidFilters() {
+    const galleryKeys = new Set(GALLERY_OPTIONS.map((option) => option.key));
+    if (!galleryKeys.has(state.gallery)) {
+      state.gallery = DEFAULT_GALLERY;
+    }
+
+    const categories = new Set(getFilterOptions("category").map((option) => option.key));
+    const statuses = new Set(getFilterOptions("status").map((option) => option.key));
+
+    if (state.category !== "all" && !categories.has(state.category)) {
+      state.category = "all";
+    }
+
+    if (state.status !== "all" && !statuses.has(state.status)) {
+      state.status = "all";
+    }
+  }
+
   function sortArtwork(a, b) {
+    const galleryCompare = galleryRank(a.galleryKey) - galleryRank(b.galleryKey);
+    if (galleryCompare !== 0) {
+      return galleryCompare;
+    }
+
     if (a.featured !== b.featured) {
       return a.featured ? -1 : 1;
     }
@@ -320,6 +400,15 @@
     }
 
     return a.title.localeCompare(b.title);
+  }
+
+  function galleryRank(galleryKey) {
+    const index = GALLERY_OPTIONS.findIndex((option) => option.key === galleryKey);
+    return index === -1 ? GALLERY_OPTIONS.length : index;
+  }
+
+  function isNsfwLocked() {
+    return state.gallery === NSFW_GALLERY && !state.nsfwAccepted;
   }
 
   function hasCloudinaryConfig() {
