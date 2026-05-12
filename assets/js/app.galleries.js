@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-video-sequence";
+  const ASSET_VERSION = "20260512-cachefix";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
