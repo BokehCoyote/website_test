@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-centered-nav";
+  const ASSET_VERSION = "20260512-video-sequence";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -40,6 +40,7 @@
     dialogTitle: document.querySelector("#dialogTitle"),
     dialogDetails: document.querySelector("#dialogDetails"),
     dialogAlt: document.querySelector("#dialogAlt"),
+    lightboxNav: document.querySelector("#lightboxNav"),
     dialogFullLink: document.querySelector("#dialogFullLink")
   };
 
@@ -306,13 +307,13 @@
     elements.dialogMeta.textContent = artwork.uploadedAt ? formatDate(artwork.uploadedAt) : "";
     elements.dialogDetails.replaceChildren();
     renderDialogMedia(artwork);
+    renderLightboxNav();
   }
 
   function renderDialogMedia(artwork) {
     clearDetailFit();
     const media = createDetailMedia(artwork);
     elements.dialogMedia.replaceChildren(media);
-    media.append(elements.dialogFullLink);
 
     if (isYoutubeVideo(artwork)) {
       elements.dialogAlt.textContent = artwork.alt;
@@ -363,12 +364,17 @@
 
     wrapper.append(image);
 
-    const sequence = getImageSequence();
-    if (sequence.length > 1) {
-      wrapper.append(createGalleryNavButton(-1), createGalleryNavButton(1));
-    }
-
     return wrapper;
+  }
+
+  function renderLightboxNav() {
+    const sequence = getLightboxSequence();
+    elements.lightboxNav.replaceChildren();
+    elements.lightboxNav.hidden = sequence.length <= 1;
+
+    if (sequence.length > 1) {
+      elements.lightboxNav.append(createGalleryNavButton(-1), createGalleryNavButton(1));
+    }
   }
 
   function createGalleryNavButton(direction) {
@@ -508,6 +514,8 @@
     elements.dialog.addEventListener("close", () => {
       clearDetailFit();
       elements.dialogMedia.replaceChildren();
+      elements.lightboxNav.replaceChildren();
+      elements.lightboxNav.hidden = true;
       elements.dialogFullLink.hidden = true;
       elements.dialog.classList.remove("is-video");
       state.activeArtworkId = null;
@@ -541,18 +549,23 @@
     return getActiveGalleryItems();
   }
 
-  function getImageSequence() {
+  function getLightboxSequence() {
     if (isNsfwLocked()) {
       return [];
     }
 
     return getFilteredArtworks()
-      .filter((artwork) => !isYoutubeVideo(artwork))
-      .flatMap((artwork) => artwork.pages.map((page, pageIndex) => ({
-        artwork,
-        page,
-        pageIndex
-      })));
+      .flatMap((artwork) => {
+        if (isYoutubeVideo(artwork)) {
+          return [{ artwork, page: null, pageIndex: 0 }];
+        }
+
+        return artwork.pages.map((page, pageIndex) => ({
+          artwork,
+          page,
+          pageIndex
+        }));
+      });
   }
 
   function ensureValidFilters() {
@@ -611,7 +624,7 @@
     return artwork.pages[Math.max(0, Math.min(index, artwork.pages.length - 1))] || null;
   }
 
-  function getActiveSequenceIndex(sequence = getImageSequence()) {
+  function getActiveSequenceIndex(sequence = getLightboxSequence()) {
     return sequence.findIndex((item) => (
       item.artwork.id === state.activeArtworkId &&
       item.pageIndex === state.activePageIndex
@@ -619,7 +632,7 @@
   }
 
   function canMoveInImageSequence(direction) {
-    const sequence = getImageSequence();
+    const sequence = getLightboxSequence();
     const activeIndex = getActiveSequenceIndex(sequence);
     if (activeIndex === -1) {
       return false;
@@ -630,7 +643,7 @@
   }
 
   function showSequenceImage(direction) {
-    const sequence = getImageSequence();
+    const sequence = getLightboxSequence();
     const activeIndex = getActiveSequenceIndex(sequence);
     if (activeIndex === -1) {
       return;
