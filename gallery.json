@@ -163,5 +163,32 @@
     "youtubeId": "CNPdO5TZ1DQ",
     "posterUrl": "",
     "featured": false
+  },
+  {
+    "id": "nsfw-comic-funny-haha",
+    "title": "Comic funny haha!",
+    "gallery": "NSFW",
+    "uploadedAt": "2026-05-12",
+    "alt": "Comic funny haha!",
+    "cloudinaryPublicId": "NSFW/nsfw-comic-funny-haha-01",
+    "featured": false,
+    "pages": [
+      {
+        "cloudinaryPublicId": "NSFW/nsfw-comic-funny-haha-01",
+        "alt": "Comic funny haha! page 1"
+      },
+      {
+        "cloudinaryPublicId": "NSFW/nsfw-comic-funny-haha-02",
+        "alt": "Comic funny haha! page 2"
+      },
+      {
+        "cloudinaryPublicId": "NSFW/nsfw-comic-funny-haha-03",
+        "alt": "Comic funny haha! page 3"
+      },
+      {
+        "cloudinaryPublicId": "NSFW/nsfw-comic-funny-haha-04",
+        "alt": "Comic funny haha! page 4"
+      }
+    ]
   }
 ]
