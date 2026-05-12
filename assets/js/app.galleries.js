@@ -1,5 +1,6 @@
 (function () {
-  const ASSET_VERSION = "20260511-hide-posts";
+  const ASSET_VERSION = "20260511-hearts";
+  const HEART_STORAGE_KEY = "bokeh-gallery-hearted";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -18,7 +19,10 @@
     artworks: [],
     gallery: DEFAULT_GALLERY,
     nsfwAccepted: false,
-    activeArtworkId: null
+    activeArtworkId: null,
+    heartCounts: new Map(),
+    heartedIds: new Set(readHeartedIds()),
+    heartsLoading: false
   };
 
   const elements = {
@@ -53,6 +57,7 @@
       const data = await fetchGallery();
       state.artworks = data.filter((item) => !item.hidden).map(normalizeArtwork).sort(sortArtwork);
       renderAll();
+      loadHeartCounts();
     } catch (error) {
       renderError(error);
     }
@@ -195,8 +200,37 @@
 
     button.append(media, body);
     button.addEventListener("click", () => openArtwork(artwork.id));
-    article.append(button);
+    article.append(button, createHeartButton(artwork));
     return article;
+  }
+
+  function createHeartButton(artwork) {
+    const count = state.heartCounts.get(artwork.id) || 0;
+    const isHearted = state.heartedIds.has(artwork.id);
+    const apiReady = hasHeartsConfig();
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "heart-button";
+    button.dataset.artworkId = artwork.id;
+    button.dataset.hearted = String(isHearted);
+    button.disabled = !apiReady || isHearted || state.heartsLoading;
+    button.setAttribute("aria-label", `${isHearted ? "Hearted" : "Heart"} ${artwork.title}`);
+    button.innerHTML = `
+      <span class="heart-icon" aria-hidden="true">&#9829;</span>
+      <span class="heart-count">${formatHeartCount(count)}</span>
+    `;
+
+    if (!apiReady) {
+      button.title = "Add heartsApiUrl in assets/js/config.js to enable hearts.";
+    } else if (isHearted) {
+      button.title = "Already hearted from this browser.";
+    }
+
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      heartArtwork(artwork.id);
+    });
+    return button;
   }
 
   function createPreviewMedia(artwork) {
@@ -305,6 +339,60 @@
     });
   }
 
+  async function loadHeartCounts() {
+    if (!hasHeartsConfig() || state.artworks.length === 0) {
+      return;
+    }
+
+    const ids = state.artworks.map((artwork) => artwork.id);
+    try {
+      const data = await heartsRequest(`?ids=${encodeURIComponent(ids.join(","))}`);
+      Object.entries(data.hearts || {}).forEach(([id, value]) => {
+        state.heartCounts.set(id, Number(value.count) || 0);
+      });
+      renderAll();
+    } catch (error) {
+      console.warn("Unable to load heart counts", error);
+    }
+  }
+
+  async function heartArtwork(id) {
+    if (!hasHeartsConfig() || state.heartedIds.has(id) || state.heartsLoading) {
+      return;
+    }
+
+    state.heartsLoading = true;
+    renderAll();
+
+    try {
+      const data = await heartsRequest(`/${encodeURIComponent(id)}`, { method: "POST" });
+      state.heartCounts.set(id, Number(data.count) || ((state.heartCounts.get(id) || 0) + 1));
+      state.heartedIds.add(id);
+      writeHeartedIds();
+    } catch (error) {
+      console.warn("Unable to save heart", error);
+    } finally {
+      state.heartsLoading = false;
+      renderAll();
+    }
+  }
+
+  async function heartsRequest(path, options = {}) {
+    const response = await fetch(`${getHeartsApiUrl()}${path}`, {
+      ...options,
+      headers: {
+        Accept: "application/json",
+        ...(options.headers || {})
+      }
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || `Hearts API ${response.status}`);
+    }
+    return data;
+  }
+
   function renderError(error) {
     elements.errorNotice.hidden = false;
     elements.errorNotice.textContent = error.message;
@@ -373,6 +461,36 @@
   function getCloudName() {
     const config = window.PORTFOLIO_CONFIG || {};
     return cleanText(config.cloudinaryCloudName, "");
+  }
+
+  function hasHeartsConfig() {
+    return getHeartsApiUrl().length > 0;
+  }
+
+  function getHeartsApiUrl() {
+    const config = window.PORTFOLIO_CONFIG || {};
+    return cleanText(config.heartsApiUrl, "").replace(/\/+$/g, "");
+  }
+
+  function readHeartedIds() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(HEART_STORAGE_KEY) || "[]");
+      return Array.isArray(stored) ? stored.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeHeartedIds() {
+    localStorage.setItem(HEART_STORAGE_KEY, JSON.stringify([...state.heartedIds]));
+  }
+
+  function formatHeartCount(value) {
+    const count = Number(value) || 0;
+    if (count > 999) {
+      return `${(count / 1000).toFixed(count > 9999 ? 0 : 1)}k`;
+    }
+    return String(count);
   }
 
   function cleanText(value, fallback) {

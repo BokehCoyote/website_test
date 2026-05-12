@@ -122,6 +122,22 @@ function createPostRow(post) {
   const row = document.createElement("article");
   row.className = `post-row${post.hidden ? " is-hidden" : ""}`;
 
+  const thumbnail = document.createElement("div");
+  thumbnail.className = "post-thumb";
+  if (post.thumbnailUrl) {
+    const image = document.createElement("img");
+    image.src = post.thumbnailUrl;
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.addEventListener("error", () => {
+      thumbnail.textContent = "No image";
+    }, { once: true });
+    thumbnail.append(image);
+  } else {
+    thumbnail.textContent = "No image";
+  }
+
   const details = document.createElement("div");
   details.className = "post-details";
 
@@ -142,7 +158,7 @@ function createPostRow(post) {
   button.textContent = post.hidden ? "Restore" : "Hide";
   button.addEventListener("click", () => setPostHidden(post.id, !post.hidden, post.title || post.id));
 
-  row.append(details, button);
+  row.append(thumbnail, details, button);
   return row;
 }
 

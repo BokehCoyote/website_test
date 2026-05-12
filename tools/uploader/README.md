@@ -34,8 +34,8 @@ npm start
 4. Click Upload and Commit.
 5. GitHub Pages republishes after the commit lands on `main`.
 
-The uploader writes `uploadedAt` automatically using the upload date. The `gallery` field controls site sorting. Cloudinary folders are only an organizational convenience.
+The uploader writes `uploadedAt` automatically using the upload date. The `gallery` field controls site sorting. Cloudinary folder settings are also sent during upload so assets land in the matching Main, Experimental, or NSFW folder.
 
 ## Manage Posts
 
-Use Refresh in Manage Posts to load `gallery.json`. Hide marks an entry with `"hidden": true`, so the public site stops showing it. Restore removes that flag. Cloudinary assets are left untouched.
+Use Refresh in Manage Posts to load `gallery.json` newest first with Cloudinary thumbnails. Hide marks an entry with `"hidden": true`, so the public site stops showing it. Restore removes that flag. Cloudinary assets are left untouched.

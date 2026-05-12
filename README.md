@@ -22,6 +22,21 @@ Open `http://localhost:4173/`. Do not use `file://`, because the site fetches `g
 
 The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, lazy loading, and larger detail images only after an artwork is opened.
 
+## Heart Buttons
+
+The gallery can show no-login heart buttons backed by a Cloudflare Worker. The static site code is already wired for it; hearts stay disabled until `heartsApiUrl` is set in `assets/js/config.js`.
+
+Worker files live in `cloudflare/hearts-worker`. Deploy that Worker with Wrangler, then set:
+
+```js
+window.PORTFOLIO_CONFIG = {
+  cloudinaryCloudName: "dvv9rmejs",
+  heartsApiUrl: "https://bokeh-gallery-hearts.<your-subdomain>.workers.dev/hearts"
+};
+```
+
+The Worker uses SQLite-backed Durable Objects for strongly consistent per-artwork counts and a 24-hour hashed-client throttle. It is not login, favorites, or strict anti-abuse; it is lightweight public interaction.
+
 ## Desktop Uploader
 
 An experimental local Electron uploader lives in `tools/uploader`. It uploads a selected local image to Cloudinary, appends a metadata entry to `gallery.json`, and commits the JSON change back to GitHub.
