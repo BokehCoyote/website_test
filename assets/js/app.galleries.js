@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-cachefix";
+  const ASSET_VERSION = "20260512-scrolltop";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -190,8 +190,12 @@
     }
 
     button.addEventListener("click", () => {
+      const changed = state[filterName] !== value;
       state[filterName] = value;
       renderAll();
+      if (changed) {
+        scrollToGalleryTop();
+      }
     });
     return button;
   }
@@ -527,10 +531,21 @@
     elements.nsfwAccept.addEventListener("click", () => {
       state.nsfwAccepted = true;
       renderAll();
+      scrollToGalleryTop();
     });
     elements.nsfwBack.addEventListener("click", () => {
       state.gallery = DEFAULT_GALLERY;
       renderAll();
+      scrollToGalleryTop();
+    });
+  }
+
+  function scrollToGalleryTop() {
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+      });
     });
   }
 
