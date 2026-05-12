@@ -1,3 +1,5 @@
+import { DurableObject } from "cloudflare:workers";
+
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://bokehcoyote.github.io",
   "https://bokeh.dog",
@@ -187,4 +189,3 @@ function json(body, status = 200, headers = {}) {
     }
   });
 }
-import { DurableObject } from "cloudflare:workers";
