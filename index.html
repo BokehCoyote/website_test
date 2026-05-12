@@ -12,6 +12,13 @@
 
     <main id="gallery" class="gallery-shell">
       <section class="controls" aria-label="Gallery controls">
+        <div id="nsfwInlinePrompt" class="nsfw-inline-prompt" hidden>
+          <p>Are you 18+ and wish to see adult content?</p>
+          <div class="nsfw-prompt-actions">
+            <button id="nsfwAccept" class="nsfw-choice" type="button">Yes</button>
+            <button id="nsfwBack" class="nsfw-choice" type="button">No</button>
+          </div>
+        </div>
         <div>
           <p class="control-label">Gallery</p>
           <div id="galleryFilters" class="segmented-control" role="list"></div>
@@ -25,20 +32,6 @@
             Add your Cloudinary cloud name in <code>assets/js/config.js</code>, then replace the
             sample public IDs in <code>gallery.json</code>. Until then, image requests are paused.
           </p>
-        </div>
-      </section>
-
-      <section id="nsfwNotice" class="notice nsfw-notice" hidden>
-        <div>
-          <p class="notice-title">Restricted gallery</p>
-          <p>
-            This section may include adult artwork. Continue only if you want to view
-            the NSFW gallery on this device.
-          </p>
-          <div class="notice-actions">
-            <button id="nsfwAccept" class="filter-button" type="button">Show NSFW Gallery</button>
-            <button id="nsfwBack" class="filter-button" type="button">Return to Main</button>
-          </div>
         </div>
       </section>
 
@@ -66,7 +59,7 @@
       </div>
     </dialog>
 
-    <script src="./assets/js/config.js?v=20260512-icons"></script>
-    <script src="./assets/js/app.galleries.js?v=20260512-icons"></script>
+    <script src="./assets/js/config.js?v=20260512-nsfw-prompt"></script>
+    <script src="./assets/js/app.galleries.js?v=20260512-nsfw-prompt"></script>
   </body>
 </html>

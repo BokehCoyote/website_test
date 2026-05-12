@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-icons";
+  const ASSET_VERSION = "20260512-nsfw-prompt";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -23,9 +23,10 @@
   };
 
   const elements = {
+    controls: document.querySelector(".controls"),
     galleryFilters: document.querySelector("#galleryFilters"),
     setupNotice: document.querySelector("#setupNotice"),
-    nsfwNotice: document.querySelector("#nsfwNotice"),
+    nsfwPrompt: document.querySelector("#nsfwInlinePrompt"),
     nsfwAccept: document.querySelector("#nsfwAccept"),
     nsfwBack: document.querySelector("#nsfwBack"),
     errorNotice: document.querySelector("#errorNotice"),
@@ -128,12 +129,19 @@
   function renderAll() {
     ensureValidFilters();
     renderSetupNotice();
+    renderNsfwPrompt();
     renderFilters();
     renderGallery();
   }
 
   function renderSetupNotice() {
     elements.setupNotice.hidden = hasCloudinaryConfig();
+  }
+
+  function renderNsfwPrompt() {
+    const nsfwLocked = isNsfwLocked();
+    elements.nsfwPrompt.hidden = !nsfwLocked;
+    elements.controls.classList.toggle("is-nsfw-prompting", nsfwLocked);
   }
 
   function renderFilters() {
@@ -187,7 +195,6 @@
     const nsfwLocked = isNsfwLocked();
     const filtered = nsfwLocked ? [] : getFilteredArtworks();
 
-    elements.nsfwNotice.hidden = !nsfwLocked;
     elements.grid.replaceChildren();
     elements.emptyState.hidden = nsfwLocked || filtered.length > 0;
 

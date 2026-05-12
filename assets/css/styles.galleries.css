@@ -111,8 +111,10 @@ dl {
   left: 50%;
   bottom: max(1rem, env(safe-area-inset-bottom));
   z-index: 12;
+  display: grid;
   width: max-content;
   max-width: calc(100% - 1rem);
+  gap: 0.6rem;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 999px;
@@ -120,6 +122,38 @@ dl {
   padding: 0.45rem;
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
+}
+
+.controls.is-nsfw-prompting {
+  min-width: min(31rem, calc(100vw - 1rem));
+  border-radius: 28px;
+  padding: 1.05rem;
+}
+
+.nsfw-inline-prompt[hidden] {
+  display: none;
+}
+
+.nsfw-inline-prompt {
+  display: grid;
+  gap: 0.8rem;
+  text-align: center;
+}
+
+.nsfw-inline-prompt p {
+  max-width: 20rem;
+  margin: 0 auto;
+  color: var(--text);
+  font-size: clamp(1.15rem, 4vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.16;
+}
+
+.nsfw-prompt-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding-inline: 0.4rem;
 }
 
 .control-label {
@@ -137,6 +171,7 @@ dl {
 }
 
 .filter-button,
+.nsfw-choice,
 .full-link,
 .dialog-close {
   border: 1px solid var(--line);
@@ -146,6 +181,21 @@ dl {
   cursor: pointer;
   text-decoration: none;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.nsfw-choice {
+  min-height: 2.4rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.nsfw-choice:hover,
+.nsfw-choice:focus-visible {
+  color: var(--accent-strong);
+  outline: none;
 }
 
 .filter-button {
@@ -204,10 +254,6 @@ dl {
 .notice-error {
   border-color: rgba(216, 75, 67, 0.7);
   color: #ffd4d1;
-}
-
-.nsfw-notice {
-  border-color: rgba(255, 107, 96, 0.7);
 }
 
 .notice-actions {
