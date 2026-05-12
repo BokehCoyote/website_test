@@ -1,11 +1,11 @@
 (function () {
-  const ASSET_VERSION = "20260512-minimal";
+  const ASSET_VERSION = "20260512-icons";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
-    { key: "main", label: "Main" },
-    { key: "experimental", label: "Experimental" },
-    { key: "nsfw", label: "NSFW" }
+    { key: "main", label: "Main", icon: "./assets/icons/main-square.svg" },
+    { key: "experimental", label: "Experimental", icon: "./assets/icons/experimental-triangle.svg" },
+    { key: "nsfw", label: "NSFW", icon: "./assets/icons/nsfw-18-plus.svg" }
   ];
   const PLACEHOLDER_CLOUD_NAMES = new Set([
     "",
@@ -148,18 +148,34 @@
     }
 
     options.forEach((option) => {
-      container.append(createFilterButton(filterName, option.key, option.label, state[filterName] === option.key));
+      container.append(createFilterButton(filterName, option.key, option, state[filterName] === option.key));
     });
   }
 
-  function createFilterButton(filterName, value, label, isActive) {
+  function createFilterButton(filterName, value, option, isActive) {
+    const label = typeof option === "string" ? option : option.label;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "filter-button";
     button.dataset.filter = filterName;
     button.dataset.value = value;
     button.setAttribute("aria-pressed", String(isActive));
-    button.textContent = label;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+
+    if (option.icon) {
+      const icon = document.createElement("img");
+      icon.className = "filter-icon";
+      icon.src = option.icon;
+      icon.alt = "";
+      icon.width = 24;
+      icon.height = 24;
+      icon.setAttribute("aria-hidden", "true");
+      button.append(icon);
+    } else {
+      button.textContent = label;
+    }
+
     button.addEventListener("click", () => {
       state[filterName] = value;
       renderAll();
