@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-gallery-nav";
+  const ASSET_VERSION = "20260512-centered-nav";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -376,9 +376,9 @@
     const isPrevious = direction < 0;
     button.type = "button";
     button.className = `lightbox-nav lightbox-nav-${isPrevious ? "prev" : "next"}`;
-    button.textContent = isPrevious ? "Previous image" : "Next image";
     button.setAttribute("aria-label", isPrevious ? "Previous gallery image" : "Next gallery image");
     button.disabled = !canMoveInImageSequence(direction);
+    button.append(createArrowIcon(isPrevious ? "left" : "right"));
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       showSequenceImage(direction);
@@ -404,6 +404,18 @@
 
     wrapper.append(iframe);
     return wrapper;
+  }
+
+  function createArrowIcon(direction) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", direction === "left" ? "M15 5 8 12l7 7" : "M9 5l7 7-7 7");
+    svg.append(path);
+    return svg;
   }
 
   function createCloudDownloadIcon() {
@@ -449,7 +461,6 @@
 
       wrapper.style.width = `${Math.max(1, Math.floor(width))}px`;
       wrapper.style.height = `${Math.max(1, Math.floor(height))}px`;
-      elements.dialogMedia.style.height = `${Math.max(1, Math.floor(height))}px`;
     };
 
     const scheduleFit = () => requestAnimationFrame(applyFit);
@@ -471,7 +482,6 @@
       window.removeEventListener("resize", state.fitResizeHandler);
       state.fitResizeHandler = null;
     }
-    elements.dialogMedia.style.height = "";
   }
 
   function createImagePlaceholder(message) {
