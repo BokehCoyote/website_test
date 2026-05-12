@@ -448,7 +448,7 @@ dl {
   object-fit: contain;
 }
 
-.comic-nav {
+.lightbox-nav {
   position: absolute;
   top: 50%;
   z-index: 2;
@@ -466,54 +466,37 @@ dl {
   backdrop-filter: blur(16px);
 }
 
-.comic-nav::before {
+.lightbox-nav::before {
   color: #ffffff;
   font-size: 2rem;
   line-height: 1;
 }
 
-.comic-nav-prev {
+.lightbox-nav-prev {
   left: 0.8rem;
 }
 
-.comic-nav-prev::before {
+.lightbox-nav-prev::before {
   content: "<";
 }
 
-.comic-nav-next {
+.lightbox-nav-next {
   right: 0.8rem;
 }
 
-.comic-nav-next::before {
+.lightbox-nav-next::before {
   content: ">";
 }
 
-.comic-nav:hover,
-.comic-nav:focus-visible {
+.lightbox-nav:hover,
+.lightbox-nav:focus-visible {
   border-color: var(--accent-strong);
   outline: none;
 }
 
-.comic-nav:disabled {
+.lightbox-nav:disabled {
   cursor: default;
   opacity: 0.32;
-}
-
-.comic-counter {
-  position: absolute;
-  left: 50%;
-  bottom: 0.8rem;
-  z-index: 2;
-  transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  background: rgba(8, 8, 8, 0.72);
-  color: #ffffff;
-  font-size: 0.78rem;
-  font-weight: 800;
-  margin: 0;
-  padding: 0.32rem 0.62rem;
-  backdrop-filter: blur(16px);
 }
 
 .dialog-media img {

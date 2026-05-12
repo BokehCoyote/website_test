@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-lightbox";
+  const ASSET_VERSION = "20260512-gallery-nav";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -294,14 +294,18 @@
 
     state.activeArtworkId = id;
     state.activePageIndex = 0;
+    renderDialogArtwork(artwork);
+
+    elements.dialog.showModal();
+    elements.dialogClose.focus();
+  }
+
+  function renderDialogArtwork(artwork) {
     elements.dialog.classList.toggle("is-video", isYoutubeVideo(artwork));
     elements.dialogTitle.textContent = artwork.title;
     elements.dialogMeta.textContent = artwork.uploadedAt ? formatDate(artwork.uploadedAt) : "";
     elements.dialogDetails.replaceChildren();
     renderDialogMedia(artwork);
-
-    elements.dialog.showModal();
-    elements.dialogClose.focus();
   }
 
   function renderDialogMedia(artwork) {
@@ -359,33 +363,27 @@
 
     wrapper.append(image);
 
-    if (isComic(artwork)) {
-      wrapper.append(createComicNavButton(artwork, -1), createComicNavButton(artwork, 1), createPageCounter(artwork));
+    const sequence = getImageSequence();
+    if (sequence.length > 1) {
+      wrapper.append(createGalleryNavButton(-1), createGalleryNavButton(1));
     }
 
     return wrapper;
   }
 
-  function createComicNavButton(artwork, direction) {
+  function createGalleryNavButton(direction) {
     const button = document.createElement("button");
     const isPrevious = direction < 0;
     button.type = "button";
-    button.className = `comic-nav comic-nav-${isPrevious ? "prev" : "next"}`;
-    button.textContent = isPrevious ? "Previous page" : "Next page";
-    button.setAttribute("aria-label", isPrevious ? "Previous comic page" : "Next comic page");
-    button.disabled = isPrevious ? state.activePageIndex === 0 : state.activePageIndex >= artwork.pages.length - 1;
+    button.className = `lightbox-nav lightbox-nav-${isPrevious ? "prev" : "next"}`;
+    button.textContent = isPrevious ? "Previous image" : "Next image";
+    button.setAttribute("aria-label", isPrevious ? "Previous gallery image" : "Next gallery image");
+    button.disabled = !canMoveInImageSequence(direction);
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      showComicPage(direction);
+      showSequenceImage(direction);
     });
     return button;
-  }
-
-  function createPageCounter(artwork) {
-    const counter = document.createElement("p");
-    counter.className = "comic-counter";
-    counter.textContent = `${state.activePageIndex + 1} / ${artwork.pages.length}`;
-    return counter;
   }
 
   function createYoutubeEmbed(artwork) {
@@ -476,16 +474,6 @@
     elements.dialogMedia.style.height = "";
   }
 
-  function createDetail(label, value) {
-    const wrapper = document.createElement("div");
-    const term = document.createElement("dt");
-    const detail = document.createElement("dd");
-    term.textContent = label;
-    detail.textContent = value;
-    wrapper.append(term, detail);
-    return wrapper;
-  }
-
   function createImagePlaceholder(message) {
     const placeholder = document.createElement("div");
     placeholder.className = "image-placeholder";
@@ -502,9 +490,9 @@
     });
     elements.dialog.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") {
-        showComicPage(-1);
+        showSequenceImage(-1);
       } else if (event.key === "ArrowRight") {
-        showComicPage(1);
+        showSequenceImage(1);
       }
     });
     elements.dialog.addEventListener("close", () => {
@@ -541,6 +529,20 @@
 
   function getFilteredArtworks() {
     return getActiveGalleryItems();
+  }
+
+  function getImageSequence() {
+    if (isNsfwLocked()) {
+      return [];
+    }
+
+    return getFilteredArtworks()
+      .filter((artwork) => !isYoutubeVideo(artwork))
+      .flatMap((artwork) => artwork.pages.map((page, pageIndex) => ({
+        artwork,
+        page,
+        pageIndex
+      })));
   }
 
   function ensureValidFilters() {
@@ -599,19 +601,39 @@
     return artwork.pages[Math.max(0, Math.min(index, artwork.pages.length - 1))] || null;
   }
 
-  function showComicPage(direction) {
-    const artwork = state.artworks.find((item) => item.id === state.activeArtworkId);
-    if (!artwork || !isComic(artwork)) {
+  function getActiveSequenceIndex(sequence = getImageSequence()) {
+    return sequence.findIndex((item) => (
+      item.artwork.id === state.activeArtworkId &&
+      item.pageIndex === state.activePageIndex
+    ));
+  }
+
+  function canMoveInImageSequence(direction) {
+    const sequence = getImageSequence();
+    const activeIndex = getActiveSequenceIndex(sequence);
+    if (activeIndex === -1) {
+      return false;
+    }
+
+    const nextIndex = activeIndex + direction;
+    return nextIndex >= 0 && nextIndex < sequence.length;
+  }
+
+  function showSequenceImage(direction) {
+    const sequence = getImageSequence();
+    const activeIndex = getActiveSequenceIndex(sequence);
+    if (activeIndex === -1) {
       return;
     }
 
-    const nextIndex = state.activePageIndex + direction;
-    if (nextIndex < 0 || nextIndex >= artwork.pages.length) {
+    const nextItem = sequence[activeIndex + direction];
+    if (!nextItem) {
       return;
     }
 
-    state.activePageIndex = nextIndex;
-    renderDialogMedia(artwork);
+    state.activeArtworkId = nextItem.artwork.id;
+    state.activePageIndex = nextItem.pageIndex;
+    renderDialogArtwork(nextItem.artwork);
   }
 
   function getVideoPosterUrl(artwork) {
