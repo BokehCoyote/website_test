@@ -30,4 +30,14 @@ for (const source of sourceFiles) {
   }
 }
 
+const mainSource = fs.readFileSync(path.join(__dirname, "main.js"), "utf8");
+if (!mainSource.includes('ipcMain.handle("video:add"')) {
+  throw new Error("Uploader must expose the YouTube video metadata flow.");
+}
+
+const rendererSource = fs.readFileSync(path.join(__dirname, "renderer", "renderer.js"), "utf8");
+if (!rendererSource.includes("window.galleryUploader.addVideo")) {
+  throw new Error("Renderer must call the YouTube video metadata flow.");
+}
+
 console.log("Uploader smoke test passed.");

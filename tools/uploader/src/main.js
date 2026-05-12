@@ -142,6 +142,49 @@ function cloudinaryDeliveryUrl(settings, publicId, transformation) {
   return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${encodedPublicId}`;
 }
 
+function youtubeThumbnailUrl(videoId) {
+  return videoId ? `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg` : "";
+}
+
+function parseYouTubeId(value) {
+  const input = String(value || "").trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) {
+    return input;
+  }
+
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    try {
+      url = new URL(`https://${input}`);
+    } catch {
+      return "";
+    }
+  }
+
+  const host = url.hostname.replace(/^www\./, "");
+  if (host === "youtu.be") {
+    const id = url.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : "";
+  }
+
+  const isYoutubeHost = host === "youtube.com" || host.endsWith(".youtube.com");
+  const isYoutubeNoCookieHost = host === "youtube-nocookie.com" || host.endsWith(".youtube-nocookie.com");
+  if (isYoutubeHost || isYoutubeNoCookieHost) {
+    const watchId = url.searchParams.get("v") || "";
+    if (/^[a-zA-Z0-9_-]{11}$/.test(watchId)) {
+      return watchId;
+    }
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    const pathId = parts.find((part, index) => ["embed", "shorts", "live"].includes(parts[index - 1])) || "";
+    return /^[a-zA-Z0-9_-]{11}$/.test(pathId) ? pathId : "";
+  }
+
+  return "";
+}
+
 function newestFirst(a, b) {
   const dateCompare = Date.parse(b.uploadedAt || "") - Date.parse(a.uploadedAt || "");
   if (!Number.isNaN(dateCompare) && dateCompare !== 0) {
@@ -161,6 +204,28 @@ function toGalleryEntry(artwork, uploadResult) {
     alt: artwork.alt || artwork.title,
     cloudinaryPublicId: uploadResult.public_id,
     featured: Boolean(artwork.featured)
+  };
+}
+
+function toVideoGalleryEntry(video) {
+  const uploadedAt = new Date().toISOString().slice(0, 10);
+  const youtubeId = parseYouTubeId(video.youtubeUrl || video.youtubeId);
+
+  if (!youtubeId) {
+    throw new Error("Enter a valid YouTube URL or 11-character video ID.");
+  }
+
+  return {
+    id: video.id || slugify(`${video.gallery || "main"}-${video.title}`),
+    title: video.title,
+    gallery: video.gallery || "Main",
+    uploadedAt,
+    alt: video.alt || `${video.title} video thumbnail`,
+    mediaType: "video",
+    videoProvider: "youtube",
+    youtubeId,
+    posterUrl: String(video.posterUrl || "").trim(),
+    featured: Boolean(video.featured)
   };
 }
 
@@ -371,6 +436,46 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
   };
 });
 
+ipcMain.handle("video:add", async (_event, payload) => {
+  const settings = await readSettings();
+  const video = payload?.video || {};
+
+  requireValue(settings.github.owner, "GitHub owner");
+  requireValue(settings.github.repo, "GitHub repo");
+  requireValue(settings.github.branch, "GitHub branch");
+  requireValue(settings.github.galleryPath, "GitHub gallery path");
+  requireValue(settings.github.token, "GitHub token");
+  requireValue(video.title, "Title");
+  requireValue(video.gallery, "Gallery");
+  requireValue(video.youtubeUrl || video.youtubeId, "YouTube URL or video ID");
+
+  const entry = toVideoGalleryEntry(video);
+  const { file, gallery, encodedPath } = await fetchGallery(settings);
+
+  if (gallery.some((item) => item.id === entry.id)) {
+    throw new Error(`gallery.json already contains id "${entry.id}". Use a unique title or custom ID.`);
+  }
+  if (gallery.some((item) => item.mediaType === "video" && item.videoProvider === "youtube" && item.youtubeId === entry.youtubeId)) {
+    throw new Error(`gallery.json already contains YouTube video "${entry.youtubeId}".`);
+  }
+
+  const nextGallery = [...gallery, entry];
+  const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `Add ${entry.title} video to gallery`);
+
+  return {
+    entry,
+    youtube: {
+      id: entry.youtubeId,
+      thumbnailUrl: youtubeThumbnailUrl(entry.youtubeId),
+      watchUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(entry.youtubeId)}`
+    },
+    github: {
+      commitSha: commit.commit?.sha,
+      htmlUrl: commit.commit?.html_url || commit.content?.html_url
+    }
+  };
+});
+
 ipcMain.handle("artwork:list", async () => {
   const settings = await readSettings();
 
@@ -388,8 +493,14 @@ ipcMain.handle("artwork:list", async () => {
       title: item.title || item.id,
       gallery: item.gallery || "Main",
       uploadedAt: item.uploadedAt || "",
+      mediaType: item.mediaType || "image",
+      videoProvider: item.videoProvider || "",
+      youtubeId: item.youtubeId || "",
       cloudinaryPublicId: item.cloudinaryPublicId || "",
-      thumbnailUrl: cloudinaryDeliveryUrl(settings, item.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
+      posterUrl: item.posterUrl || "",
+      thumbnailUrl: item.mediaType === "video"
+        ? (item.posterUrl || youtubeThumbnailUrl(item.youtubeId))
+        : cloudinaryDeliveryUrl(settings, item.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
       hidden: Boolean(item.hidden)
     }))
     .sort(newestFirst)
@@ -434,8 +545,14 @@ ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
       title: nextItem.title || nextItem.id,
       gallery: nextItem.gallery || "Main",
       uploadedAt: nextItem.uploadedAt || "",
+      mediaType: nextItem.mediaType || "image",
+      videoProvider: nextItem.videoProvider || "",
+      youtubeId: nextItem.youtubeId || "",
       cloudinaryPublicId: nextItem.cloudinaryPublicId || "",
-      thumbnailUrl: cloudinaryDeliveryUrl(settings, nextItem.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
+      posterUrl: nextItem.posterUrl || "",
+      thumbnailUrl: nextItem.mediaType === "video"
+        ? (nextItem.posterUrl || youtubeThumbnailUrl(nextItem.youtubeId))
+        : cloudinaryDeliveryUrl(settings, nextItem.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
       hidden: Boolean(nextItem.hidden)
     },
     github: {

@@ -1,6 +1,6 @@
 # Bokeh Coyote Gallery Test
 
-Plain static GitHub Pages gallery for testing an art portfolio workflow with Cloudinary-hosted images and local JSON metadata.
+Plain static GitHub Pages gallery for testing an art portfolio workflow with Cloudinary-hosted images, YouTube-hosted videos, and local JSON metadata.
 
 ## Local Preview
 
@@ -12,15 +12,18 @@ python3 -m http.server 4173
 
 Open `http://localhost:4173/`. Do not use `file://`, because the site fetches `gallery.json`.
 
-## Cloudinary Setup
+## Media Setup
 
 1. Upload optimized artwork masters to Cloudinary.
 2. Copy each Cloudinary public ID.
 3. Replace `replace-with-your-cloud-name` in `assets/js/config.js`.
-4. Replace or add entries in `gallery.json`.
-5. Commit and push. GitHub Pages republishes the static site.
+4. For videos, upload to YouTube as public or unlisted and copy the video URL or ID.
+5. Replace or add entries in `gallery.json`.
+6. Commit and push. GitHub Pages republishes the static site.
 
 The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, lazy loading, and larger detail images only after an artwork is opened.
+
+YouTube posts render a thumbnail in the gallery and load the `youtube-nocookie.com` embed only when the post is opened.
 
 ## Heart Buttons
 
@@ -39,7 +42,7 @@ The Worker uses SQLite-backed Durable Objects for strongly consistent per-artwor
 
 ## Desktop Uploader
 
-An experimental local Electron uploader lives in `tools/uploader`. It uploads a selected local image to Cloudinary, appends a metadata entry to `gallery.json`, and commits the JSON change back to GitHub.
+An experimental local Electron uploader lives in `tools/uploader`. It uploads a selected local image to Cloudinary or adds YouTube video metadata, appends an entry to `gallery.json`, and commits the JSON change back to GitHub.
 
 Run it from Finder by double-clicking `Open Gallery Uploader.command`, or run it locally:
 
@@ -53,7 +56,7 @@ The uploader stores Cloudinary and GitHub credentials in Electron's local app da
 
 ## `gallery.json` Fields
 
-Each artwork entry should use this shape:
+Image entries should use this shape:
 
 ```json
 {
@@ -68,6 +71,25 @@ Each artwork entry should use this shape:
 ```
 
 Keep full artwork files out of GitHub. GitHub should store only the website files and metadata.
+
+Video entries use the same gallery metadata plus YouTube fields:
+
+```json
+{
+  "id": "video-slug",
+  "title": "Video Title",
+  "gallery": "Main",
+  "uploadedAt": "2026-05-12",
+  "alt": "Video thumbnail description",
+  "mediaType": "video",
+  "videoProvider": "youtube",
+  "youtubeId": "VIDEO_ID",
+  "posterUrl": "",
+  "featured": false
+}
+```
+
+Existing image entries do not need `"mediaType"`; the site treats missing media type as `"image"`.
 
 Set `"hidden": true` to hide an entry from the public site without deleting the Cloudinary asset. The desktop uploader can add or remove this flag from Manage Posts.
 

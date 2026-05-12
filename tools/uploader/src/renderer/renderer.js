@@ -9,6 +9,7 @@ const elements = {
   settingsForm: $("#settingsForm"),
   closeSettings: $("#closeSettings"),
   cancelSettings: $("#cancelSettings"),
+  mediaType: $("#mediaType"),
   chooseImage: $("#chooseImage"),
   fileSummary: $("#fileSummary"),
   artworkForm: $("#artworkForm"),
@@ -102,6 +103,31 @@ function readArtworkForm() {
   };
 }
 
+function readVideoForm() {
+  const title = $("#title").value.trim();
+  return {
+    title,
+    id: $("#id").value.trim() || toSlug(`${$("#gallery").value}-${title}`),
+    gallery: $("#gallery").value,
+    alt: $("#alt").value.trim() || `${title} video thumbnail`,
+    featured: $("#featured").checked,
+    youtubeUrl: $("#youtubeUrl").value.trim(),
+    posterUrl: $("#posterUrl").value.trim()
+  };
+}
+
+function updateMediaMode() {
+  const isVideo = elements.mediaType.value === "youtube";
+  document.querySelectorAll(".image-field").forEach((field) => {
+    field.hidden = isVideo;
+  });
+  document.querySelectorAll(".video-field").forEach((field) => {
+    field.hidden = !isVideo;
+  });
+  $("#youtubeUrl").required = isVideo;
+  elements.submitButton.textContent = isVideo ? "Add Video and Commit" : "Upload and Commit";
+}
+
 function renderPosts(posts) {
   elements.postList.replaceChildren();
 
@@ -148,7 +174,9 @@ function createPostRow(post) {
   meta.textContent = [post.gallery, post.uploadedAt, post.hidden ? "Hidden" : "Visible"].filter(Boolean).join(" - ");
 
   const publicId = document.createElement("small");
-  publicId.textContent = post.cloudinaryPublicId || post.id;
+  publicId.textContent = post.mediaType === "video"
+    ? `YouTube ${post.youtubeId || post.id}`
+    : (post.cloudinaryPublicId || post.id);
 
   details.append(title, meta, publicId);
 
@@ -216,6 +244,7 @@ elements.settingsForm.addEventListener("submit", async (event) => {
 });
 
 elements.refreshPosts.addEventListener("click", loadPosts);
+elements.mediaType.addEventListener("change", updateMediaMode);
 
 elements.chooseImage.addEventListener("click", async () => {
   const file = await window.galleryUploader.chooseImage();
@@ -233,23 +262,27 @@ elements.chooseImage.addEventListener("click", async () => {
 elements.artworkForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  if (!selectedFile) {
+  const isVideo = elements.mediaType.value === "youtube";
+
+  if (!isVideo && !selectedFile) {
     log("Choose an image before uploading.", "error");
     return;
   }
 
   elements.submitButton.disabled = true;
-  elements.submitButton.textContent = "Uploading...";
-  log("Uploading image to Cloudinary.");
+  elements.submitButton.textContent = isVideo ? "Committing..." : "Uploading...";
+  log(isVideo ? "Adding YouTube metadata to gallery.json." : "Uploading image to Cloudinary.");
 
   try {
-    const result = await window.galleryUploader.uploadArtwork({
-      filePath: selectedFile.path,
-      artwork: readArtworkForm()
-    });
+    const result = isVideo
+      ? await window.galleryUploader.addVideo({ video: readVideoForm() })
+      : await window.galleryUploader.uploadArtwork({
+        filePath: selectedFile.path,
+        artwork: readArtworkForm()
+      });
 
     elements.result.hidden = false;
-    elements.resultPublicId.textContent = result.cloudinary.publicId;
+    elements.resultPublicId.textContent = result.youtube?.id || result.cloudinary?.publicId || result.entry.id;
     elements.resultCommit.textContent = result.github.commitSha || "View commit";
     elements.resultCommit.href = result.github.htmlUrl || "#";
     log(`Committed ${result.entry.title} to gallery.json.`, "success");
@@ -258,10 +291,11 @@ elements.artworkForm.addEventListener("submit", async (event) => {
     log(error.message, "error");
   } finally {
     elements.submitButton.disabled = false;
-    elements.submitButton.textContent = "Upload and Commit";
+    updateMediaMode();
   }
 });
 
 loadSettings().then(() => {
+  updateMediaMode();
   log("Uploader ready.");
 });

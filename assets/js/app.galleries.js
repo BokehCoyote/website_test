@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260511-hearts";
+  const ASSET_VERSION = "20260512-video";
   const HEART_STORAGE_KEY = "bokeh-gallery-hearted";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
@@ -92,6 +92,10 @@
       gallery,
       galleryKey: slugify(gallery) || DEFAULT_GALLERY,
       alt: cleanText(item.alt, `${title} artwork image`),
+      mediaType: cleanText(item.mediaType, "image").toLowerCase(),
+      videoProvider: cleanText(item.videoProvider, "").toLowerCase(),
+      youtubeId: cleanText(item.youtubeId, ""),
+      posterUrl: cleanText(item.posterUrl, ""),
       cloudinaryPublicId: cleanText(item.cloudinaryPublicId, ""),
       featured: Boolean(item.featured)
     };
@@ -166,7 +170,7 @@
 
   function createArtworkCard(artwork) {
     const article = document.createElement("article");
-    article.className = "art-card";
+    article.className = `art-card${isYoutubeVideo(artwork) ? " art-card-video" : ""}`;
 
     const button = document.createElement("button");
     button.type = "button";
@@ -188,6 +192,7 @@
       </div>
       <div class="card-meta">
         <span>${escapeHtml(artwork.gallery)}</span>
+        <span>${isYoutubeVideo(artwork) ? "Video" : "Image"}</span>
       </div>
     `;
 
@@ -234,6 +239,10 @@
   }
 
   function createPreviewMedia(artwork) {
+    if (isYoutubeVideo(artwork)) {
+      return createVideoPreview(artwork);
+    }
+
     if (!canRenderCloudinary(artwork)) {
       return createImagePlaceholder("Cloudinary preview paused");
     }
@@ -255,6 +264,33 @@
     return image;
   }
 
+  function createVideoPreview(artwork) {
+    const posterUrl = getVideoPosterUrl(artwork);
+    if (!posterUrl) {
+      return createImagePlaceholder("Video thumbnail unavailable");
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "video-preview";
+
+    const image = document.createElement("img");
+    image.src = posterUrl;
+    image.alt = artwork.alt;
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.addEventListener("error", () => {
+      image.replaceWith(createImagePlaceholder("Video thumbnail unavailable"));
+    }, { once: true });
+
+    const play = document.createElement("span");
+    play.className = "play-badge";
+    play.setAttribute("aria-hidden", "true");
+    play.textContent = "Play";
+
+    wrapper.append(image, play);
+    return wrapper;
+  }
+
   function openArtwork(id) {
     const artwork = state.artworks.find((item) => item.id === id);
 
@@ -271,8 +307,13 @@
     elements.dialogDetails.replaceChildren();
     elements.dialogMedia.replaceChildren(createDetailMedia(artwork));
 
-    if (canRenderCloudinary(artwork)) {
+    if (isYoutubeVideo(artwork)) {
+      elements.dialogFullLink.href = youtubeWatchUrl(artwork.youtubeId);
+      elements.dialogFullLink.textContent = "Open on YouTube";
+      elements.dialogFullLink.hidden = false;
+    } else if (canRenderCloudinary(artwork)) {
       elements.dialogFullLink.href = cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_2600");
+      elements.dialogFullLink.textContent = "View larger image";
       elements.dialogFullLink.hidden = false;
     } else {
       elements.dialogFullLink.hidden = true;
@@ -283,6 +324,10 @@
   }
 
   function createDetailMedia(artwork) {
+    if (isYoutubeVideo(artwork)) {
+      return createYoutubeEmbed(artwork);
+    }
+
     if (!canRenderCloudinary(artwork)) {
       return createImagePlaceholder("Add Cloudinary config to load detail image");
     }
@@ -295,6 +340,26 @@
       image.replaceWith(createImagePlaceholder("Detail image not found in Cloudinary"));
     }, { once: true });
     return image;
+  }
+
+  function createYoutubeEmbed(artwork) {
+    if (!artwork.youtubeId) {
+      return createImagePlaceholder("Missing YouTube video ID");
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "video-embed";
+
+    const iframe = document.createElement("iframe");
+    iframe.title = artwork.title;
+    iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(artwork.youtubeId)}?autoplay=1&playsinline=1&rel=0`;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+    iframe.loading = "eager";
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+
+    wrapper.append(iframe);
+    return wrapper;
   }
 
   function createDetail(label, value) {
@@ -450,6 +515,24 @@
 
   function canRenderCloudinary(artwork) {
     return hasCloudinaryConfig() && artwork.cloudinaryPublicId.length > 0;
+  }
+
+  function isYoutubeVideo(artwork) {
+    return artwork.mediaType === "video" && artwork.videoProvider === "youtube";
+  }
+
+  function getVideoPosterUrl(artwork) {
+    if (artwork.posterUrl) {
+      return artwork.posterUrl;
+    }
+    if (!artwork.youtubeId) {
+      return "";
+    }
+    return `https://i.ytimg.com/vi/${encodeURIComponent(artwork.youtubeId)}/hqdefault.jpg`;
+  }
+
+  function youtubeWatchUrl(videoId) {
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   }
 
   function cloudinaryUrl(publicId, transformation) {
