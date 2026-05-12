@@ -119,14 +119,35 @@ function cleanSegment(value) {
     .replace(/[?#\\%<>+]+/g, "-");
 }
 
-function buildPublicId(settings, artwork, filePath) {
+function buildUploadTarget(settings, artwork, filePath) {
   const gallery = artwork.gallery || "Main";
   const folder = cleanSegment(settings.cloudinaryFolders?.[gallery] || gallery);
   const base = slugify(artwork.publicId || artwork.id || artwork.title || path.basename(filePath, path.extname(filePath)));
   if (!base) {
     throw new Error("A title or public ID is required to name the Cloudinary asset.");
   }
-  return folder ? `${folder}/${base}` : base;
+  return {
+    folder,
+    publicId: folder ? `${folder}/${base}` : base,
+    uploadPublicId: base
+  };
+}
+
+function cloudinaryDeliveryUrl(settings, publicId, transformation) {
+  const cloudName = encodeURIComponent(settings.cloudinary.cloudName || "");
+  const encodedPublicId = String(publicId || "").split("/").map(encodeURIComponent).join("/");
+  if (!cloudName || !encodedPublicId) {
+    return "";
+  }
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${encodedPublicId}`;
+}
+
+function newestFirst(a, b) {
+  const dateCompare = Date.parse(b.uploadedAt || "") - Date.parse(a.uploadedAt || "");
+  if (!Number.isNaN(dateCompare) && dateCompare !== 0) {
+    return dateCompare;
+  }
+  return b.index - a.index;
 }
 
 function toGalleryEntry(artwork, uploadResult) {
@@ -299,10 +320,10 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
     secure: true
   });
 
-  const publicId = buildPublicId(settings, artwork, filePath);
+  const uploadTarget = buildUploadTarget(settings, artwork, filePath);
   const entryDraft = {
     id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
-    cloudinaryPublicId: publicId
+    cloudinaryPublicId: uploadTarget.publicId
   };
   const { file, gallery, encodedPath } = await fetchGallery(settings);
 
@@ -315,7 +336,9 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
 
   const uploadResult = await cloudinary.uploader.upload(filePath, {
     resource_type: "image",
-    public_id: publicId,
+    public_id: uploadTarget.uploadPublicId,
+    folder: uploadTarget.folder || undefined,
+    asset_folder: uploadTarget.folder || undefined,
     overwrite: false,
     use_filename: false,
     unique_filename: false,
@@ -358,14 +381,19 @@ ipcMain.handle("artwork:list", async () => {
   requireValue(settings.github.token, "GitHub token");
 
   const { gallery } = await fetchGallery(settings);
-  return gallery.map((item) => ({
-    id: item.id,
-    title: item.title || item.id,
-    gallery: item.gallery || "Main",
-    uploadedAt: item.uploadedAt || "",
-    cloudinaryPublicId: item.cloudinaryPublicId || "",
-    hidden: Boolean(item.hidden)
-  }));
+  return gallery
+    .map((item, index) => ({
+      index,
+      id: item.id,
+      title: item.title || item.id,
+      gallery: item.gallery || "Main",
+      uploadedAt: item.uploadedAt || "",
+      cloudinaryPublicId: item.cloudinaryPublicId || "",
+      thumbnailUrl: cloudinaryDeliveryUrl(settings, item.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
+      hidden: Boolean(item.hidden)
+    }))
+    .sort(newestFirst)
+    .map(({ index, ...item }) => item);
 });
 
 ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
@@ -407,6 +435,7 @@ ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
       gallery: nextItem.gallery || "Main",
       uploadedAt: nextItem.uploadedAt || "",
       cloudinaryPublicId: nextItem.cloudinaryPublicId || "",
+      thumbnailUrl: cloudinaryDeliveryUrl(settings, nextItem.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
       hidden: Boolean(nextItem.hidden)
     },
     github: {
