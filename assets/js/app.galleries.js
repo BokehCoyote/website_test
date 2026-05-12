@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-nsfw-panel";
+  const ASSET_VERSION = "20260512-lightbox";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -19,7 +19,8 @@
     gallery: DEFAULT_GALLERY,
     nsfwAccepted: false,
     activeArtworkId: null,
-    activePageIndex: 0
+    activePageIndex: 0,
+    fitResizeHandler: null
   };
 
   const elements = {
@@ -295,9 +296,7 @@
     state.activePageIndex = 0;
     elements.dialog.classList.toggle("is-video", isYoutubeVideo(artwork));
     elements.dialogTitle.textContent = artwork.title;
-    elements.dialogMeta.textContent = [artwork.gallery, artwork.uploadedAt ? `Uploaded ${formatDate(artwork.uploadedAt)}` : ""]
-      .filter(Boolean)
-      .join(" / ");
+    elements.dialogMeta.textContent = artwork.uploadedAt ? formatDate(artwork.uploadedAt) : "";
     elements.dialogDetails.replaceChildren();
     renderDialogMedia(artwork);
 
@@ -306,13 +305,14 @@
   }
 
   function renderDialogMedia(artwork) {
-    elements.dialogMedia.replaceChildren(createDetailMedia(artwork));
+    clearDetailFit();
+    const media = createDetailMedia(artwork);
+    elements.dialogMedia.replaceChildren(media);
+    media.append(elements.dialogFullLink);
 
     if (isYoutubeVideo(artwork)) {
       elements.dialogAlt.textContent = artwork.alt;
-      elements.dialogFullLink.href = youtubeWatchUrl(artwork.youtubeId);
-      elements.dialogFullLink.textContent = "Open on YouTube";
-      elements.dialogFullLink.hidden = false;
+      setFullLink(youtubeWatchUrl(artwork.youtubeId), `Open ${artwork.title} on YouTube`);
       return;
     }
 
@@ -320,12 +320,19 @@
     elements.dialogAlt.textContent = page?.alt || artwork.alt;
 
     if (canRenderCloudinaryPage(page)) {
-      elements.dialogFullLink.href = cloudinaryUrl(page.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_2600");
-      elements.dialogFullLink.textContent = isComic(artwork) ? `View page ${state.activePageIndex + 1} larger` : "View larger image";
-      elements.dialogFullLink.hidden = false;
+      const label = isComic(artwork) ? `Open page ${state.activePageIndex + 1} of ${artwork.title}` : `Open larger image for ${artwork.title}`;
+      setFullLink(cloudinaryUrl(page.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_2600"), label);
     } else {
       elements.dialogFullLink.hidden = true;
     }
+  }
+
+  function setFullLink(href, label) {
+    elements.dialogFullLink.href = href;
+    elements.dialogFullLink.hidden = false;
+    elements.dialogFullLink.title = label;
+    elements.dialogFullLink.setAttribute("aria-label", label);
+    elements.dialogFullLink.replaceChildren(createCloudDownloadIcon());
   }
 
   function createDetailMedia(artwork) {
@@ -348,6 +355,7 @@
     image.addEventListener("error", () => {
       image.replaceWith(createImagePlaceholder("Detail image not found in Cloudinary"));
     }, { once: true });
+    fitDetailImageFrame(wrapper, image);
 
     wrapper.append(image);
 
@@ -400,6 +408,74 @@
     return wrapper;
   }
 
+  function createCloudDownloadIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+
+    [
+      "M19 17.5a4 4 0 0 0-1-7.87A6 6 0 0 0 6.38 8.25 4.5 4.5 0 0 0 7.5 17.5",
+      "M12 12v7",
+      "M8.75 15.75 12 19l3.25-3.25"
+    ].forEach((d) => {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      svg.append(path);
+    });
+
+    return svg;
+  }
+
+  function fitDetailImageFrame(wrapper, image) {
+    const applyFit = () => {
+      if (!elements.dialog.open || !image.naturalWidth || !image.naturalHeight) {
+        return;
+      }
+
+      const dialogStyles = getComputedStyle(elements.dialog);
+      const layoutStyles = getComputedStyle(elements.dialog.querySelector(".dialog-layout"));
+      const verticalPadding = parseFloat(dialogStyles.paddingTop) + parseFloat(dialogStyles.paddingBottom);
+      const layoutGap = parseFloat(layoutStyles.rowGap || layoutStyles.gap) || 0;
+      const copyHeight = elements.dialog.querySelector(".dialog-copy").getBoundingClientRect().height || 34;
+      const maxWidth = elements.dialogMedia.clientWidth;
+      const maxHeight = Math.max(180, window.innerHeight - verticalPadding - layoutGap - copyHeight);
+
+      let width = maxWidth;
+      let height = width * (image.naturalHeight / image.naturalWidth);
+
+      if (height > maxHeight) {
+        height = maxHeight;
+        width = height * (image.naturalWidth / image.naturalHeight);
+      }
+
+      wrapper.style.width = `${Math.max(1, Math.floor(width))}px`;
+      wrapper.style.height = `${Math.max(1, Math.floor(height))}px`;
+      elements.dialogMedia.style.height = `${Math.max(1, Math.floor(height))}px`;
+    };
+
+    const scheduleFit = () => requestAnimationFrame(applyFit);
+
+    if (image.complete && image.naturalWidth) {
+      scheduleFit();
+    } else {
+      image.addEventListener("load", scheduleFit, { once: true });
+    }
+
+    clearDetailFit();
+    state.fitResizeHandler = scheduleFit;
+    window.addEventListener("resize", state.fitResizeHandler);
+    requestAnimationFrame(scheduleFit);
+  }
+
+  function clearDetailFit() {
+    if (state.fitResizeHandler) {
+      window.removeEventListener("resize", state.fitResizeHandler);
+      state.fitResizeHandler = null;
+    }
+    elements.dialogMedia.style.height = "";
+  }
+
   function createDetail(label, value) {
     const wrapper = document.createElement("div");
     const term = document.createElement("dt");
@@ -432,6 +508,7 @@
       }
     });
     elements.dialog.addEventListener("close", () => {
+      clearDetailFit();
       elements.dialogMedia.replaceChildren();
       elements.dialogFullLink.hidden = true;
       elements.dialog.classList.remove("is-video");
