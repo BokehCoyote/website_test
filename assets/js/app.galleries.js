@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-nsfw-prompt";
+  const ASSET_VERSION = "20260512-nsfw-panel";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -140,7 +140,10 @@
 
   function renderNsfwPrompt() {
     const nsfwLocked = isNsfwLocked();
-    elements.nsfwPrompt.hidden = !nsfwLocked;
+    elements.nsfwPrompt.setAttribute("aria-hidden", String(!nsfwLocked));
+    elements.nsfwPrompt.inert = !nsfwLocked;
+    elements.nsfwAccept.disabled = !nsfwLocked;
+    elements.nsfwBack.disabled = !nsfwLocked;
     elements.controls.classList.toggle("is-nsfw-prompting", nsfwLocked);
   }
 

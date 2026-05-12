@@ -12,11 +12,11 @@
 
     <main id="gallery" class="gallery-shell">
       <section class="controls" aria-label="Gallery controls">
-        <div id="nsfwInlinePrompt" class="nsfw-inline-prompt" hidden>
+        <div id="nsfwInlinePrompt" class="nsfw-inline-prompt" aria-hidden="true">
           <p>Are you 18+ and wish to see adult content?</p>
           <div class="nsfw-prompt-actions">
-            <button id="nsfwAccept" class="nsfw-choice" type="button">Yes</button>
-            <button id="nsfwBack" class="nsfw-choice" type="button">No</button>
+            <button id="nsfwAccept" class="nsfw-choice" type="button" disabled>Yes</button>
+            <button id="nsfwBack" class="nsfw-choice" type="button" disabled>No</button>
           </div>
         </div>
         <div>
@@ -59,7 +59,7 @@
       </div>
     </dialog>
 
-    <script src="./assets/js/config.js?v=20260512-nsfw-prompt"></script>
-    <script src="./assets/js/app.galleries.js?v=20260512-nsfw-prompt"></script>
+    <script src="./assets/js/config.js?v=20260512-nsfw-panel"></script>
+    <script src="./assets/js/app.galleries.js?v=20260512-nsfw-panel"></script>
   </body>
 </html>
