@@ -74,11 +74,6 @@ a {
   transform: translateY(0);
 }
 
-.site-footer {
-  width: min(100% - 2rem, var(--max-width));
-  margin-inline: auto;
-}
-
 .gallery-shell {
   width: min(100% - 1.25rem, 1500px);
   margin-inline: auto;
@@ -510,13 +505,6 @@ dl {
   padding: 0.6rem 0.8rem;
 }
 
-.site-footer {
-  border-top: 1px solid var(--line);
-  padding: 1.25rem 0 2rem;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
 @media (max-width: 860px) {
   .dialog-layout {
     grid-template-columns: 1fr;
@@ -549,8 +537,7 @@ dl {
 }
 
 @media (max-width: 560px) {
-  .gallery-shell,
-  .site-footer {
+  .gallery-shell {
     width: min(100% - 1rem, var(--max-width));
   }
 
