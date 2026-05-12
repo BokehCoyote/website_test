@@ -75,9 +75,13 @@ a {
 }
 
 .masthead,
-.gallery-shell,
 .site-footer {
   width: min(100% - 2rem, var(--max-width));
+  margin-inline: auto;
+}
+
+.gallery-shell {
+  width: min(100% - 1.25rem, 1500px);
   margin-inline: auto;
 }
 
@@ -105,7 +109,6 @@ a {
 .eyebrow,
 .control-label,
 .notice-title,
-.card-meta,
 .detail-list dt {
   color: var(--muted);
   font-size: 0.72rem;
@@ -184,31 +187,36 @@ h1 {
 }
 
 .gallery-shell {
-  padding-bottom: 3rem;
+  padding-bottom: 6rem;
 }
 
 .controls {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.4rem;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: rgba(8, 8, 8, 0.92);
-  padding: 0.9rem 0;
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 12;
+  width: max-content;
+  max-width: calc(100% - 1rem);
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  background: rgba(8, 8, 8, 0.78);
+  padding: 0.45rem;
   backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
 }
 
 .control-label {
-  margin-bottom: 0.6rem;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .segmented-control {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.45rem;
 }
 
@@ -225,8 +233,9 @@ h1 {
 }
 
 .filter-button {
-  min-height: 2.45rem;
-  padding: 0.52rem 0.74rem;
+  min-height: 2.35rem;
+  border-radius: 999px;
+  padding: 0.48rem 0.78rem;
 }
 
 .filter-button:hover,
@@ -277,17 +286,20 @@ h1 {
 }
 
 .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: 1rem;
+  column-count: 4;
+  column-gap: 0.8rem;
 }
 
 .art-card {
   position: relative;
+  display: inline-block;
+  width: 100%;
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  break-inside: avoid;
+  margin: 0 0 0.8rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -310,18 +322,20 @@ h1 {
 .art-card-media {
   position: relative;
   display: grid;
-  aspect-ratio: 4 / 5;
   overflow: hidden;
-  background: var(--panel-strong);
+  background: transparent;
 }
 
 .art-card-media img,
-.dialog-media img,
 .video-preview {
   width: 100%;
-  height: 100%;
   display: block;
-  object-fit: cover;
+}
+
+.art-card-media img,
+.video-preview img {
+  height: auto;
+  object-fit: contain;
 }
 
 .art-card-media img,
@@ -372,106 +386,9 @@ h1 {
   text-align: center;
 }
 
-.featured-badge {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  border-radius: 4px;
-  background: rgba(8, 8, 8, 0.78);
-  color: #ffffff;
-  font-size: 0.72rem;
-  font-weight: 760;
-  padding: 0.32rem 0.45rem;
-  text-transform: uppercase;
-}
-
-.heart-button {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 2.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  background: rgba(8, 8, 8, 0.78);
-  color: #ffffff;
-  cursor: pointer;
-  padding: 0.34rem 0.62rem;
-  backdrop-filter: blur(14px);
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-.heart-button:hover,
-.heart-button:focus-visible {
-  border-color: var(--accent-strong);
-  background: rgba(34, 16, 15, 0.9);
-  outline: none;
-  transform: translateY(-1px);
-}
-
-.heart-button:disabled {
-  cursor: default;
-  opacity: 0.72;
-  transform: none;
-}
-
-.heart-button[data-hearted="true"] {
-  border-color: rgba(255, 107, 96, 0.62);
-  background: rgba(216, 75, 67, 0.92);
-  color: #080808;
-}
-
-.heart-icon {
-  font-size: 1.05rem;
-  line-height: 1;
-}
-
-.heart-count {
-  min-width: 1ch;
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.art-card-body {
-  padding: 0.95rem;
-}
-
-.card-heading {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 0.8rem;
-}
-
-.card-heading h2 {
-  margin-bottom: 0.5rem;
-  font-size: 1.1rem;
-  line-height: 1.18;
-}
-
-.card-heading span {
-  flex: 0 0 auto;
-  color: var(--muted);
-}
-
-.art-card-body p {
-  margin-bottom: 0.85rem;
-  color: var(--muted);
-}
-
-.card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.8rem;
-}
-
 .artwork-dialog {
-  width: min(1120px, calc(100% - 2rem));
-  max-height: min(820px, calc(100vh - 2rem));
+  width: min(1220px, calc(100% - 2rem));
+  max-height: min(880px, calc(100vh - 2rem));
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -504,6 +421,34 @@ h1 {
   display: grid;
   min-height: 420px;
   background: var(--panel-strong);
+}
+
+.artwork-dialog.is-video {
+  width: min(1280px, calc(100% - 2rem));
+}
+
+.artwork-dialog.is-video .dialog-layout {
+  grid-template-columns: 1fr;
+}
+
+.artwork-dialog.is-video .dialog-media {
+  min-height: auto;
+  background: #000000;
+}
+
+.artwork-dialog.is-video .dialog-copy {
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  padding: 1rem 1.2rem;
+}
+
+.artwork-dialog.is-video .dialog-copy h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.artwork-dialog.is-video .dialog-alt {
+  display: none;
 }
 
 .comic-reader {
@@ -594,7 +539,6 @@ h1 {
 .video-embed {
   display: grid;
   width: 100%;
-  align-self: center;
   aspect-ratio: 16 / 9;
 }
 
@@ -654,13 +598,8 @@ h1 {
 
 @media (max-width: 860px) {
   .intro,
-  .controls,
   .dialog-layout {
     grid-template-columns: 1fr;
-  }
-
-  .controls {
-    position: static;
   }
 
   .dialog-copy {
@@ -681,6 +620,18 @@ h1 {
   }
 }
 
+@media (max-width: 1100px) {
+  .gallery-grid {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 720px) {
+  .gallery-grid {
+    column-count: 2;
+  }
+}
+
 @media (max-width: 560px) {
   .masthead,
   .gallery-shell,
@@ -698,7 +649,7 @@ h1 {
   }
 
   .filter-button {
-    flex: 1 1 auto;
+    padding-inline: 0.62rem;
   }
 
   h1 {
@@ -711,5 +662,9 @@ h1 {
 
   .dialog-copy h2 {
     font-size: 2.2rem;
+  }
+
+  .gallery-grid {
+    column-count: 1;
   }
 }

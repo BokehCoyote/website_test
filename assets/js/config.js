@@ -1,4 +1,3 @@
 window.PORTFOLIO_CONFIG = {
-  cloudinaryCloudName: "dvv9rmejs",
-  heartsApiUrl: ""
+  cloudinaryCloudName: "dvv9rmejs"
 };

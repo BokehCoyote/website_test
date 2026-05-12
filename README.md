@@ -21,24 +21,9 @@ Open `http://localhost:4173/`. Do not use `file://`, because the site fetches `g
 5. Replace or add entries in `gallery.json`.
 6. Commit and push. GitHub Pages republishes the static site.
 
-The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, lazy loading, and larger detail images only after an artwork is opened. Multi-page comics use the first page as the cover and show previous/next controls in the detail modal.
+The site generates delivery URLs with `f_auto,q_auto`, lazy loading, and free-form image cards that show the full image in the gallery. Multi-page comics use the first page as the cover and show previous/next controls in the detail modal.
 
 YouTube posts render a thumbnail in the gallery and load the `youtube-nocookie.com` embed only when the post is opened.
-
-## Heart Buttons
-
-The gallery can show no-login heart buttons backed by a Cloudflare Worker. The static site code is already wired for it; hearts stay disabled until `heartsApiUrl` is set in `assets/js/config.js`.
-
-Worker files live in `cloudflare/hearts-worker`. Deploy that Worker with Wrangler, then set:
-
-```js
-window.PORTFOLIO_CONFIG = {
-  cloudinaryCloudName: "dvv9rmejs",
-  heartsApiUrl: "https://bokeh-gallery-hearts.<your-subdomain>.workers.dev/hearts"
-};
-```
-
-The Worker uses SQLite-backed Durable Objects for strongly consistent per-artwork counts and a 24-hour hashed-client throttle. It is not login, favorites, or strict anti-abuse; it is lightweight public interaction.
 
 ## Desktop Uploader
 
