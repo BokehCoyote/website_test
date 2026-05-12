@@ -1,6 +1,6 @@
 # Bokeh Coyote Gallery Test
 
-Plain static GitHub Pages gallery for testing an art portfolio workflow with Cloudinary-hosted images, YouTube-hosted videos, and local JSON metadata.
+Plain static GitHub Pages gallery for testing an art portfolio workflow with Cloudinary-hosted images, multi-page comics, YouTube-hosted videos, and local JSON metadata.
 
 ## Local Preview
 
@@ -21,7 +21,7 @@ Open `http://localhost:4173/`. Do not use `file://`, because the site fetches `g
 5. Replace or add entries in `gallery.json`.
 6. Commit and push. GitHub Pages republishes the static site.
 
-The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, lazy loading, and larger detail images only after an artwork is opened.
+The site generates delivery URLs with `f_auto,q_auto`, thumbnail width limits, lazy loading, and larger detail images only after an artwork is opened. Multi-page comics use the first page as the cover and show previous/next controls in the detail modal.
 
 YouTube posts render a thumbnail in the gallery and load the `youtube-nocookie.com` embed only when the post is opened.
 
@@ -42,7 +42,7 @@ The Worker uses SQLite-backed Durable Objects for strongly consistent per-artwor
 
 ## Desktop Uploader
 
-An experimental local Electron uploader lives in `tools/uploader`. It uploads a selected local image to Cloudinary or adds YouTube video metadata, appends an entry to `gallery.json`, and commits the JSON change back to GitHub.
+An experimental local Electron uploader lives in `tools/uploader`. It uploads one or more selected local images to Cloudinary or adds YouTube video metadata, appends an entry to `gallery.json`, and commits the JSON change back to GitHub.
 
 Run it from Finder by double-clicking `Open Gallery Uploader.command`, or run it locally:
 
@@ -90,6 +90,24 @@ Video entries use the same gallery metadata plus YouTube fields:
 ```
 
 Existing image entries do not need `"mediaType"`; the site treats missing media type as `"image"`.
+
+Multi-page comics are image entries with a `pages` array. Keep `cloudinaryPublicId` set to the first page for compatibility:
+
+```json
+{
+  "id": "comic-title",
+  "title": "Comic Title",
+  "gallery": "Main",
+  "uploadedAt": "2026-05-12",
+  "alt": "Comic title cover page",
+  "cloudinaryPublicId": "Main/comic-title-01",
+  "pages": [
+    { "cloudinaryPublicId": "Main/comic-title-01", "alt": "Comic title page 1" },
+    { "cloudinaryPublicId": "Main/comic-title-02", "alt": "Comic title page 2" }
+  ],
+  "featured": false
+}
+```
 
 Set `"hidden": true` to hide an entry from the public site without deleting the Cloudinary asset. The desktop uploader can add or remove this flag from Manage Posts.
 

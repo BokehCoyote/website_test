@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-video";
+  const ASSET_VERSION = "20260512-comics";
   const HEART_STORAGE_KEY = "bokeh-gallery-hearted";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
@@ -20,6 +20,7 @@
     gallery: DEFAULT_GALLERY,
     nsfwAccepted: false,
     activeArtworkId: null,
+    activePageIndex: 0,
     heartCounts: new Map(),
     heartedIds: new Set(readHeartedIds()),
     heartsLoading: false
@@ -84,6 +85,9 @@
     const id = cleanText(item.id, slugify(title) || `artwork-${index + 1}`);
     const gallery = cleanText(item.gallery, DEFAULT_GALLERY);
     const uploadedAt = cleanText(item.uploadedAt, cleanText(item.year, ""));
+    const mediaType = cleanText(item.mediaType, "image").toLowerCase();
+    const pages = mediaType === "video" ? [] : normalizePages(item, title);
+    const coverPage = pages[0] || null;
 
     return {
       id,
@@ -91,14 +95,42 @@
       uploadedAt,
       gallery,
       galleryKey: slugify(gallery) || DEFAULT_GALLERY,
-      alt: cleanText(item.alt, `${title} artwork image`),
-      mediaType: cleanText(item.mediaType, "image").toLowerCase(),
+      alt: cleanText(item.alt, coverPage?.alt || `${title} artwork image`),
+      mediaType,
       videoProvider: cleanText(item.videoProvider, "").toLowerCase(),
       youtubeId: cleanText(item.youtubeId, ""),
       posterUrl: cleanText(item.posterUrl, ""),
-      cloudinaryPublicId: cleanText(item.cloudinaryPublicId, ""),
+      cloudinaryPublicId: cleanText(item.cloudinaryPublicId, coverPage?.cloudinaryPublicId || ""),
+      pages,
       featured: Boolean(item.featured)
     };
+  }
+
+  function normalizePages(item, title) {
+    const rawPages = Array.isArray(item.pages) ? item.pages : [];
+    const pages = rawPages
+      .map((page, index) => {
+        const isObject = page && typeof page === "object";
+        const cloudinaryPublicId = cleanText(isObject ? page.cloudinaryPublicId : page, "");
+        if (!cloudinaryPublicId) {
+          return null;
+        }
+        return {
+          cloudinaryPublicId,
+          alt: cleanText(isObject ? page.alt : "", `${title} page ${index + 1}`)
+        };
+      })
+      .filter(Boolean);
+
+    if (pages.length > 0) {
+      return pages;
+    }
+
+    const cloudinaryPublicId = cleanText(item.cloudinaryPublicId, "");
+    return cloudinaryPublicId ? [{
+      cloudinaryPublicId,
+      alt: cleanText(item.alt, `${title} artwork image`)
+    }] : [];
   }
 
   function renderAll() {
@@ -192,7 +224,8 @@
       </div>
       <div class="card-meta">
         <span>${escapeHtml(artwork.gallery)}</span>
-        <span>${isYoutubeVideo(artwork) ? "Video" : "Image"}</span>
+        <span>${escapeHtml(getMediaLabel(artwork))}</span>
+        ${isComic(artwork) ? `<span>${artwork.pages.length} pages</span>` : ""}
       </div>
     `;
 
@@ -243,19 +276,20 @@
       return createVideoPreview(artwork);
     }
 
-    if (!canRenderCloudinary(artwork)) {
+    const coverPage = getArtworkPage(artwork, 0);
+    if (!canRenderCloudinaryPage(coverPage)) {
       return createImagePlaceholder("Cloudinary preview paused");
     }
 
     const image = document.createElement("img");
-    image.src = cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_640");
+    image.src = cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_640");
     image.srcset = [
-      `${cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_420")} 420w`,
-      `${cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_640")} 640w`,
-      `${cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_900")} 900w`
+      `${cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_420")} 420w`,
+      `${cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_640")} 640w`,
+      `${cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_900")} 900w`
     ].join(", ");
     image.sizes = "(min-width: 980px) 31vw, (min-width: 680px) 46vw, 92vw";
-    image.alt = artwork.alt;
+    image.alt = coverPage.alt;
     image.loading = "lazy";
     image.decoding = "async";
     image.addEventListener("error", () => {
@@ -299,28 +333,39 @@
     }
 
     state.activeArtworkId = id;
+    state.activePageIndex = 0;
     elements.dialogTitle.textContent = artwork.title;
     elements.dialogMeta.textContent = [artwork.gallery, artwork.uploadedAt ? `Uploaded ${formatDate(artwork.uploadedAt)}` : ""]
       .filter(Boolean)
       .join(" / ");
-    elements.dialogAlt.textContent = artwork.alt;
     elements.dialogDetails.replaceChildren();
+    renderDialogMedia(artwork);
+
+    elements.dialog.showModal();
+    elements.dialogClose.focus();
+  }
+
+  function renderDialogMedia(artwork) {
     elements.dialogMedia.replaceChildren(createDetailMedia(artwork));
 
     if (isYoutubeVideo(artwork)) {
+      elements.dialogAlt.textContent = artwork.alt;
       elements.dialogFullLink.href = youtubeWatchUrl(artwork.youtubeId);
       elements.dialogFullLink.textContent = "Open on YouTube";
       elements.dialogFullLink.hidden = false;
-    } else if (canRenderCloudinary(artwork)) {
-      elements.dialogFullLink.href = cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_2600");
-      elements.dialogFullLink.textContent = "View larger image";
+      return;
+    }
+
+    const page = getArtworkPage(artwork, state.activePageIndex);
+    elements.dialogAlt.textContent = page?.alt || artwork.alt;
+
+    if (canRenderCloudinaryPage(page)) {
+      elements.dialogFullLink.href = cloudinaryUrl(page.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_2600");
+      elements.dialogFullLink.textContent = isComic(artwork) ? `View page ${state.activePageIndex + 1} larger` : "View larger image";
       elements.dialogFullLink.hidden = false;
     } else {
       elements.dialogFullLink.hidden = true;
     }
-
-    elements.dialog.showModal();
-    elements.dialogClose.focus();
   }
 
   function createDetailMedia(artwork) {
@@ -328,18 +373,51 @@
       return createYoutubeEmbed(artwork);
     }
 
-    if (!canRenderCloudinary(artwork)) {
+    const page = getArtworkPage(artwork, state.activePageIndex);
+    if (!canRenderCloudinaryPage(page)) {
       return createImagePlaceholder("Add Cloudinary config to load detail image");
     }
 
+    const wrapper = document.createElement("div");
+    wrapper.className = "comic-reader";
+
     const image = document.createElement("img");
-    image.src = cloudinaryUrl(artwork.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_1800");
-    image.alt = artwork.alt;
+    image.src = cloudinaryUrl(page.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_1800");
+    image.alt = page.alt;
     image.decoding = "async";
     image.addEventListener("error", () => {
       image.replaceWith(createImagePlaceholder("Detail image not found in Cloudinary"));
     }, { once: true });
-    return image;
+
+    wrapper.append(image);
+
+    if (isComic(artwork)) {
+      wrapper.append(createComicNavButton(artwork, -1), createComicNavButton(artwork, 1), createPageCounter(artwork));
+    }
+
+    return wrapper;
+  }
+
+  function createComicNavButton(artwork, direction) {
+    const button = document.createElement("button");
+    const isPrevious = direction < 0;
+    button.type = "button";
+    button.className = `comic-nav comic-nav-${isPrevious ? "prev" : "next"}`;
+    button.textContent = isPrevious ? "Previous page" : "Next page";
+    button.setAttribute("aria-label", isPrevious ? "Previous comic page" : "Next comic page");
+    button.disabled = isPrevious ? state.activePageIndex === 0 : state.activePageIndex >= artwork.pages.length - 1;
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showComicPage(direction);
+    });
+    return button;
+  }
+
+  function createPageCounter(artwork) {
+    const counter = document.createElement("p");
+    counter.className = "comic-counter";
+    counter.textContent = `${state.activePageIndex + 1} / ${artwork.pages.length}`;
+    return counter;
   }
 
   function createYoutubeEmbed(artwork) {
@@ -386,10 +464,18 @@
         elements.dialog.close();
       }
     });
+    elements.dialog.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") {
+        showComicPage(-1);
+      } else if (event.key === "ArrowRight") {
+        showComicPage(1);
+      }
+    });
     elements.dialog.addEventListener("close", () => {
       elements.dialogMedia.replaceChildren();
       elements.dialogFullLink.hidden = true;
       state.activeArtworkId = null;
+      state.activePageIndex = 0;
     });
   }
 
@@ -514,11 +600,45 @@
   }
 
   function canRenderCloudinary(artwork) {
-    return hasCloudinaryConfig() && artwork.cloudinaryPublicId.length > 0;
+    return canRenderCloudinaryPage(getArtworkPage(artwork, 0));
+  }
+
+  function canRenderCloudinaryPage(page) {
+    return hasCloudinaryConfig() && Boolean(page?.cloudinaryPublicId);
   }
 
   function isYoutubeVideo(artwork) {
     return artwork.mediaType === "video" && artwork.videoProvider === "youtube";
+  }
+
+  function isComic(artwork) {
+    return !isYoutubeVideo(artwork) && artwork.pages.length > 1;
+  }
+
+  function getMediaLabel(artwork) {
+    if (isYoutubeVideo(artwork)) {
+      return "Video";
+    }
+    return isComic(artwork) ? "Comic" : "Image";
+  }
+
+  function getArtworkPage(artwork, index) {
+    return artwork.pages[Math.max(0, Math.min(index, artwork.pages.length - 1))] || null;
+  }
+
+  function showComicPage(direction) {
+    const artwork = state.artworks.find((item) => item.id === state.activeArtworkId);
+    if (!artwork || !isComic(artwork)) {
+      return;
+    }
+
+    const nextIndex = state.activePageIndex + direction;
+    if (nextIndex < 0 || nextIndex >= artwork.pages.length) {
+      return;
+    }
+
+    state.activePageIndex = nextIndex;
+    renderDialogMedia(artwork);
   }
 
   function getVideoPosterUrl(artwork) {

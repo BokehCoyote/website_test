@@ -119,17 +119,18 @@ function cleanSegment(value) {
     .replace(/[?#\\%<>+]+/g, "-");
 }
 
-function buildUploadTarget(settings, artwork, filePath) {
+function buildUploadTarget(settings, artwork, filePath, pageIndex = 0, pageCount = 1) {
   const gallery = artwork.gallery || "Main";
   const folder = cleanSegment(settings.cloudinaryFolders?.[gallery] || gallery);
   const base = slugify(artwork.publicId || artwork.id || artwork.title || path.basename(filePath, path.extname(filePath)));
   if (!base) {
     throw new Error("A title or public ID is required to name the Cloudinary asset.");
   }
+  const pageBase = pageCount > 1 ? `${base}-${String(pageIndex + 1).padStart(2, "0")}` : base;
   return {
     folder,
-    publicId: folder ? `${folder}/${base}` : base,
-    uploadPublicId: base
+    publicId: folder ? `${folder}/${pageBase}` : pageBase,
+    uploadPublicId: pageBase
   };
 }
 
@@ -193,18 +194,55 @@ function newestFirst(a, b) {
   return b.index - a.index;
 }
 
-function toGalleryEntry(artwork, uploadResult) {
-  const uploadedAt = new Date().toISOString().slice(0, 10);
+function getEntryPublicIds(item) {
+  const ids = new Set();
+  if (item.cloudinaryPublicId) {
+    ids.add(item.cloudinaryPublicId);
+  }
+  if (Array.isArray(item.pages)) {
+    item.pages.forEach((page) => {
+      if (page?.cloudinaryPublicId) {
+        ids.add(page.cloudinaryPublicId);
+      }
+    });
+  }
+  return [...ids];
+}
 
-  return {
+function getCoverPublicId(item) {
+  if (Array.isArray(item.pages) && item.pages[0]?.cloudinaryPublicId) {
+    return item.pages[0].cloudinaryPublicId;
+  }
+  return item.cloudinaryPublicId || "";
+}
+
+function getPageCount(item) {
+  return Array.isArray(item.pages) && item.pages.length > 0 ? item.pages.length : 1;
+}
+
+function toGalleryEntry(artwork, uploadResults) {
+  const uploadedAt = new Date().toISOString().slice(0, 10);
+  const results = Array.isArray(uploadResults) ? uploadResults : [uploadResults];
+  const pages = results.map((result, index) => ({
+    cloudinaryPublicId: result.public_id,
+    alt: `${artwork.alt || artwork.title} page ${index + 1}`
+  }));
+
+  const entry = {
     id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
     title: artwork.title,
     gallery: artwork.gallery || "Main",
     uploadedAt,
     alt: artwork.alt || artwork.title,
-    cloudinaryPublicId: uploadResult.public_id,
+    cloudinaryPublicId: results[0].public_id,
     featured: Boolean(artwork.featured)
   };
+
+  if (pages.length > 1) {
+    entry.pages = pages;
+  }
+
+  return entry;
 }
 
 function toVideoGalleryEntry(video) {
@@ -341,8 +379,8 @@ ipcMain.handle("settings:save", async (_event, incoming) => {
 
 ipcMain.handle("image:choose", async () => {
   const result = await dialog.showOpenDialog({
-    title: "Choose optimized artwork image",
-    properties: ["openFile"],
+    title: "Choose optimized artwork image(s)",
+    properties: ["openFile", "multiSelections"],
     filters: [
       { name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "avif", "tif", "tiff"] }
     ]
@@ -352,21 +390,35 @@ ipcMain.handle("image:choose", async () => {
     return null;
   }
 
-  const filePath = result.filePaths[0];
-  const stat = await fs.stat(filePath);
+  const files = await Promise.all(result.filePaths.map(async (filePath) => {
+    const stat = await fs.stat(filePath);
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      size: stat.size
+    };
+  }));
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+
   return {
-    path: filePath,
-    name: path.basename(filePath),
-    size: stat.size
+    path: files[0].path,
+    name: files.length === 1 ? files[0].name : `${files.length} images selected`,
+    size: totalSize,
+    count: files.length,
+    files
   };
 });
 
 ipcMain.handle("artwork:upload", async (_event, payload) => {
   const settings = await readSettings();
   const artwork = payload?.artwork || {};
-  const filePath = payload?.filePath;
+  const filePaths = Array.isArray(payload?.filePaths) && payload.filePaths.length > 0
+    ? payload.filePaths
+    : [payload?.filePath].filter(Boolean);
 
-  requireValue(filePath, "Image file");
+  if (filePaths.length === 0) {
+    throw new Error("Image file is required.");
+  }
   requireValue(settings.cloudinary.cloudName, "Cloudinary cloud name");
   requireValue(settings.cloudinary.apiKey, "Cloudinary API key");
   requireValue(settings.cloudinary.apiSecret, "Cloudinary API secret");
@@ -385,49 +437,68 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
     secure: true
   });
 
-  const uploadTarget = buildUploadTarget(settings, artwork, filePath);
+  const uploadTargets = filePaths.map((filePath, index) => buildUploadTarget(settings, artwork, filePath, index, filePaths.length));
   const entryDraft = {
     id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
-    cloudinaryPublicId: uploadTarget.publicId
+    cloudinaryPublicIds: uploadTargets.map((target) => target.publicId)
   };
   const { file, gallery, encodedPath } = await fetchGallery(settings);
 
   if (gallery.some((item) => item.id === entryDraft.id)) {
     throw new Error(`gallery.json already contains id "${entryDraft.id}". Use a unique title or custom ID.`);
   }
-  if (gallery.some((item) => item.cloudinaryPublicId === entryDraft.cloudinaryPublicId)) {
-    throw new Error(`gallery.json already contains public ID "${entryDraft.cloudinaryPublicId}".`);
+
+  const existingPublicIds = new Set(gallery.flatMap(getEntryPublicIds));
+  const duplicatePublicId = entryDraft.cloudinaryPublicIds.find((publicId) => existingPublicIds.has(publicId));
+  if (duplicatePublicId) {
+    throw new Error(`gallery.json already contains public ID "${duplicatePublicId}".`);
   }
 
-  const uploadResult = await cloudinary.uploader.upload(filePath, {
-    resource_type: "image",
-    public_id: uploadTarget.uploadPublicId,
-    folder: uploadTarget.folder || undefined,
-    asset_folder: uploadTarget.folder || undefined,
-    overwrite: false,
-    use_filename: false,
-    unique_filename: false,
-    tags: ["portfolio", artwork.gallery].filter(Boolean),
-    context: {
-      title: artwork.title,
-      alt: artwork.alt || artwork.title,
-      gallery: artwork.gallery
-    }
-  });
+  const uploadResults = [];
+  for (const [index, filePath] of filePaths.entries()) {
+    const uploadTarget = uploadTargets[index];
+    const uploadResult = await cloudinary.uploader.upload(filePath, {
+      resource_type: "image",
+      public_id: uploadTarget.uploadPublicId,
+      folder: uploadTarget.folder || undefined,
+      asset_folder: uploadTarget.folder || undefined,
+      overwrite: false,
+      use_filename: false,
+      unique_filename: false,
+      tags: ["portfolio", artwork.gallery, filePaths.length > 1 ? "comic" : ""].filter(Boolean),
+      context: {
+        title: artwork.title,
+        alt: filePaths.length > 1 ? `${artwork.alt || artwork.title} page ${index + 1}` : artwork.alt || artwork.title,
+        gallery: artwork.gallery,
+        page: String(index + 1),
+        page_count: String(filePaths.length)
+      }
+    });
+    uploadResults.push(uploadResult);
+  }
 
-  const entry = toGalleryEntry(artwork, uploadResult);
+  const entry = toGalleryEntry(artwork, uploadResults);
   const nextGallery = [...gallery, entry];
   const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `Add ${entry.title} to gallery`);
 
   return {
     entry,
     cloudinary: {
-      publicId: uploadResult.public_id,
-      secureUrl: uploadResult.secure_url,
-      width: uploadResult.width,
-      height: uploadResult.height,
-      bytes: uploadResult.bytes,
-      format: uploadResult.format
+      publicId: uploadResults[0].public_id,
+      secureUrl: uploadResults[0].secure_url,
+      width: uploadResults[0].width,
+      height: uploadResults[0].height,
+      bytes: uploadResults.reduce((sum, result) => sum + (result.bytes || 0), 0),
+      format: uploadResults[0].format,
+      pageCount: uploadResults.length,
+      pages: uploadResults.map((result) => ({
+        publicId: result.public_id,
+        secureUrl: result.secure_url,
+        width: result.width,
+        height: result.height,
+        bytes: result.bytes,
+        format: result.format
+      }))
     },
     github: {
       commitSha: commit.commit?.sha,
@@ -498,9 +569,10 @@ ipcMain.handle("artwork:list", async () => {
       youtubeId: item.youtubeId || "",
       cloudinaryPublicId: item.cloudinaryPublicId || "",
       posterUrl: item.posterUrl || "",
+      pageCount: item.mediaType === "video" ? 1 : getPageCount(item),
       thumbnailUrl: item.mediaType === "video"
         ? (item.posterUrl || youtubeThumbnailUrl(item.youtubeId))
-        : cloudinaryDeliveryUrl(settings, item.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
+        : cloudinaryDeliveryUrl(settings, getCoverPublicId(item), "f_auto,q_auto,c_fill,w_112,h_112"),
       hidden: Boolean(item.hidden)
     }))
     .sort(newestFirst)
@@ -550,9 +622,10 @@ ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
       youtubeId: nextItem.youtubeId || "",
       cloudinaryPublicId: nextItem.cloudinaryPublicId || "",
       posterUrl: nextItem.posterUrl || "",
+      pageCount: nextItem.mediaType === "video" ? 1 : getPageCount(nextItem),
       thumbnailUrl: nextItem.mediaType === "video"
         ? (nextItem.posterUrl || youtubeThumbnailUrl(nextItem.youtubeId))
-        : cloudinaryDeliveryUrl(settings, nextItem.cloudinaryPublicId, "f_auto,q_auto,c_fill,w_112,h_112"),
+        : cloudinaryDeliveryUrl(settings, getCoverPublicId(nextItem), "f_auto,q_auto,c_fill,w_112,h_112"),
       hidden: Boolean(nextItem.hidden)
     },
     github: {

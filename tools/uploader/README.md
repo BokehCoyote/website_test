@@ -2,7 +2,7 @@
 
 Local Electron uploader for the static GitHub Pages gallery.
 
-The app uploads an optimized image master to Cloudinary or adds YouTube video metadata, creates a `gallery.json` entry, and commits the updated JSON to `BokehCoyote/website_test` through the GitHub Contents API.
+The app uploads one or more optimized image masters to Cloudinary or adds YouTube video metadata, creates a `gallery.json` entry, and commits the updated JSON to `BokehCoyote/website_test` through the GitHub Contents API.
 
 ## Security
 
@@ -29,12 +29,12 @@ npm start
 ## Image Upload Flow
 
 1. Open Settings and enter Cloudinary and GitHub credentials.
-2. Choose an optimized local image.
+2. Choose one optimized local image, or select multiple ordered images for a comic.
 3. Fill out the artwork metadata.
 4. Click Upload and Commit.
 5. GitHub Pages republishes after the commit lands on `main`.
 
-The uploader writes `uploadedAt` automatically using the upload date. The `gallery` field controls site sorting. Cloudinary folder settings are also sent during upload so assets land in the matching Main, Experimental, or NSFW folder.
+The uploader writes `uploadedAt` automatically using the upload date. The `gallery` field controls site sorting. Cloudinary folder settings are also sent during upload so assets land in the matching Main, Experimental, or NSFW folder. Multi-image uploads are saved as one post with a `pages` array and page-suffixed public IDs like `Main/comic-title-01`.
 
 ## YouTube Video Flow
 
@@ -48,4 +48,4 @@ The website shows the poster or YouTube thumbnail in the gallery and loads the Y
 
 ## Manage Posts
 
-Use Refresh in Manage Posts to load `gallery.json` newest first with image or video thumbnails. Hide marks an entry with `"hidden": true`, so the public site stops showing it. Restore removes that flag. Cloudinary assets and YouTube videos are left untouched.
+Use Refresh in Manage Posts to load `gallery.json` newest first with image, comic, or video thumbnails. Hide marks an entry with `"hidden": true`, so the public site stops showing it. Restore removes that flag. Cloudinary assets and YouTube videos are left untouched.

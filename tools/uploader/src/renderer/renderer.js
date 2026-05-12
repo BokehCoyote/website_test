@@ -1,4 +1,4 @@
-let selectedFile = null;
+let selectedFiles = [];
 let settings = null;
 
 const $ = (selector) => document.querySelector(selector);
@@ -171,7 +171,12 @@ function createPostRow(post) {
   title.textContent = post.title || post.id;
 
   const meta = document.createElement("span");
-  meta.textContent = [post.gallery, post.uploadedAt, post.hidden ? "Hidden" : "Visible"].filter(Boolean).join(" - ");
+  meta.textContent = [
+    post.gallery,
+    post.uploadedAt,
+    post.mediaType === "video" ? "Video" : Number(post.pageCount) > 1 ? `${post.pageCount} page comic` : "Image",
+    post.hidden ? "Hidden" : "Visible"
+  ].filter(Boolean).join(" - ");
 
   const publicId = document.createElement("small");
   publicId.textContent = post.mediaType === "video"
@@ -247,15 +252,22 @@ elements.refreshPosts.addEventListener("click", loadPosts);
 elements.mediaType.addEventListener("change", updateMediaMode);
 
 elements.chooseImage.addEventListener("click", async () => {
-  const file = await window.galleryUploader.chooseImage();
-  if (!file) return;
+  const selection = await window.galleryUploader.chooseImage();
+  if (!selection) return;
 
-  selectedFile = file;
-  elements.fileSummary.textContent = `${file.name} - ${formatBytes(file.size)}`;
+  selectedFiles = selection.files || [{
+    path: selection.path,
+    name: selection.name,
+    size: selection.size
+  }];
+  const fileCount = selectedFiles.length;
+  elements.fileSummary.textContent = fileCount === 1
+    ? `${selectedFiles[0].name} - ${formatBytes(selectedFiles[0].size)}`
+    : `${fileCount} images selected - ${formatBytes(selection.size)}`;
 
   const title = $("#title");
   if (!title.value) {
-    title.value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+    title.value = selectedFiles[0].name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
   }
 });
 
@@ -264,20 +276,21 @@ elements.artworkForm.addEventListener("submit", async (event) => {
 
   const isVideo = elements.mediaType.value === "youtube";
 
-  if (!isVideo && !selectedFile) {
-    log("Choose an image before uploading.", "error");
+  if (!isVideo && selectedFiles.length === 0) {
+    log("Choose one or more images before uploading.", "error");
     return;
   }
 
   elements.submitButton.disabled = true;
   elements.submitButton.textContent = isVideo ? "Committing..." : "Uploading...";
-  log(isVideo ? "Adding YouTube metadata to gallery.json." : "Uploading image to Cloudinary.");
+  log(isVideo ? "Adding YouTube metadata to gallery.json." : `Uploading ${selectedFiles.length} image${selectedFiles.length === 1 ? "" : "s"} to Cloudinary.`);
 
   try {
     const result = isVideo
       ? await window.galleryUploader.addVideo({ video: readVideoForm() })
       : await window.galleryUploader.uploadArtwork({
-        filePath: selectedFile.path,
+        filePath: selectedFiles[0].path,
+        filePaths: selectedFiles.map((file) => file.path),
         artwork: readArtworkForm()
       });
 
@@ -285,7 +298,7 @@ elements.artworkForm.addEventListener("submit", async (event) => {
     elements.resultPublicId.textContent = result.youtube?.id || result.cloudinary?.publicId || result.entry.id;
     elements.resultCommit.textContent = result.github.commitSha || "View commit";
     elements.resultCommit.href = result.github.htmlUrl || "#";
-    log(`Committed ${result.entry.title} to gallery.json.`, "success");
+    log(`Committed ${result.entry.title}${result.cloudinary?.pageCount > 1 ? ` (${result.cloudinary.pageCount} pages)` : ""} to gallery.json.`, "success");
     await loadPosts();
   } catch (error) {
     log(error.message, "error");

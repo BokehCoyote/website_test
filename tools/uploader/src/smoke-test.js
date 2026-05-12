@@ -39,5 +39,12 @@ const rendererSource = fs.readFileSync(path.join(__dirname, "renderer", "rendere
 if (!rendererSource.includes("window.galleryUploader.addVideo")) {
   throw new Error("Renderer must call the YouTube video metadata flow.");
 }
+if (!rendererSource.includes("filePaths: selectedFiles.map")) {
+  throw new Error("Renderer must pass multi-image selections to the upload flow.");
+}
+
+if (!mainSource.includes("multiSelections") || !mainSource.includes("entry.pages = pages")) {
+  throw new Error("Uploader must support multi-page comic uploads.");
+}
 
 console.log("Uploader smoke test passed.");

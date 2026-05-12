@@ -506,6 +506,86 @@ h1 {
   background: var(--panel-strong);
 }
 
+.comic-reader {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  place-items: center;
+}
+
+.comic-reader img {
+  grid-area: 1 / 1;
+}
+
+.comic-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: inline-grid;
+  width: 3rem;
+  height: 4.5rem;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(8, 8, 8, 0.72);
+  color: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+}
+
+.comic-nav::before {
+  color: #ffffff;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.comic-nav-prev {
+  left: 0.8rem;
+}
+
+.comic-nav-prev::before {
+  content: "<";
+}
+
+.comic-nav-next {
+  right: 0.8rem;
+}
+
+.comic-nav-next::before {
+  content: ">";
+}
+
+.comic-nav:hover,
+.comic-nav:focus-visible {
+  border-color: var(--accent-strong);
+  outline: none;
+}
+
+.comic-nav:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
+.comic-counter {
+  position: absolute;
+  left: 50%;
+  bottom: 0.8rem;
+  z-index: 2;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 8, 8, 0.72);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0;
+  padding: 0.32rem 0.62rem;
+  backdrop-filter: blur(16px);
+}
+
 .dialog-media img {
   max-height: min(820px, calc(100vh - 2rem));
   object-fit: contain;
