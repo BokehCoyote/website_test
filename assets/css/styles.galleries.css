@@ -74,7 +74,6 @@ a {
   transform: translateY(0);
 }
 
-.masthead,
 .site-footer {
   width: min(100% - 2rem, var(--max-width));
   margin-inline: auto;
@@ -85,27 +84,6 @@ a {
   margin-inline: auto;
 }
 
-.masthead {
-  padding: 1.25rem 0 1.6rem;
-}
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 1rem;
-}
-
-.brand {
-  color: var(--text);
-  font-size: 1.15rem;
-  font-weight: 750;
-  text-decoration: none;
-}
-
-.project-kicker,
 .eyebrow,
 .control-label,
 .notice-title,
@@ -117,76 +95,19 @@ a {
   text-transform: uppercase;
 }
 
-.intro {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 380px);
-  gap: clamp(1.5rem, 5vw, 5rem);
-  align-items: end;
-  padding: clamp(2rem, 7vw, 5.2rem) 0 clamp(1.5rem, 4vw, 3rem);
-}
-
-.intro-copy {
-  max-width: 760px;
-}
-
 .eyebrow {
   margin: 0 0 0.8rem;
   color: var(--accent-strong);
 }
 
-h1,
 h2,
 p,
 dl {
   margin-top: 0;
 }
 
-h1 {
-  max-width: 760px;
-  margin-bottom: 1rem;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 5.8rem;
-  font-weight: 500;
-  line-height: 0.96;
-}
-
-.intro-copy p:last-child {
-  max-width: 640px;
-  margin-bottom: 0;
-  color: var(--muted);
-  font-size: 1.08rem;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--line);
-}
-
-.stats div {
-  min-width: 0;
-  background: rgba(18, 18, 18, 0.92);
-  padding: 1rem;
-}
-
-.stats dt {
-  margin-bottom: 0.25rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-}
-
-.stats dd {
-  margin: 0;
-  font-size: 2.25rem;
-  font-weight: 760;
-}
-
 .gallery-shell {
+  padding-top: 1rem;
   padding-bottom: 6rem;
 }
 
@@ -597,7 +518,6 @@ h1 {
 }
 
 @media (max-width: 860px) {
-  .intro,
   .dialog-layout {
     grid-template-columns: 1fr;
   }
@@ -609,10 +529,6 @@ h1 {
 
   .dialog-media {
     min-height: 320px;
-  }
-
-  h1 {
-    font-size: 4rem;
   }
 
   .dialog-copy h2 {
@@ -633,31 +549,13 @@ h1 {
 }
 
 @media (max-width: 560px) {
-  .masthead,
   .gallery-shell,
   .site-footer {
     width: min(100% - 1rem, var(--max-width));
   }
 
-  .topbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .stats {
-    grid-template-columns: 1fr;
-  }
-
   .filter-button {
     padding-inline: 0.62rem;
-  }
-
-  h1 {
-    font-size: 2.6rem;
-  }
-
-  .stats dd {
-    font-size: 1.8rem;
   }
 
   .dialog-copy h2 {

@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-layout";
+  const ASSET_VERSION = "20260512-minimal";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -23,9 +23,6 @@
   };
 
   const elements = {
-    total: document.querySelector("#statTotal"),
-    featured: document.querySelector("#statFeatured"),
-    available: document.querySelector("#statAvailable"),
     galleryFilters: document.querySelector("#galleryFilters"),
     setupNotice: document.querySelector("#setupNotice"),
     nsfwNotice: document.querySelector("#nsfwNotice"),
@@ -135,13 +132,6 @@
     renderGallery();
   }
 
-  function renderStats(filteredItems) {
-    const galleryItems = getActiveGalleryItems();
-    elements.total.textContent = galleryItems.length;
-    elements.featured.textContent = galleryItems.filter((item) => item.featured).length;
-    elements.available.textContent = filteredItems.length;
-  }
-
   function renderSetupNotice() {
     elements.setupNotice.hidden = hasCloudinaryConfig();
   }
@@ -184,7 +174,6 @@
     elements.nsfwNotice.hidden = !nsfwLocked;
     elements.grid.replaceChildren();
     elements.emptyState.hidden = nsfwLocked || filtered.length > 0;
-    renderStats(filtered);
 
     if (nsfwLocked) {
       return;
