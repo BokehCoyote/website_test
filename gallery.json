@@ -30,5 +30,15 @@
     "mediaType": "image",
     "assetPath": "artwork/nsfw-deer-guy",
     "featured": false
+  },
+  {
+    "id": "main-otter",
+    "title": "otter",
+    "gallery": "Main",
+    "uploadedAt": "2026-05-13",
+    "alt": "otter",
+    "mediaType": "image",
+    "assetPath": "artwork/main-otter",
+    "featured": false
   }
 ]
