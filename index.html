@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Static GitHub Pages gallery test using Cloudinary-hosted artwork images, comics, and YouTube video posts.">
+    <meta name="description" content="Static GitHub Pages gallery using Cloudflare R2-hosted artwork images, comics, and YouTube video posts.">
     <title>Bokeh Coyote Gallery Test</title>
     <link rel="stylesheet" href="./assets/css/styles.galleries.css?v=20260512-centered-gallery">
   </head>
@@ -27,10 +27,10 @@
 
       <section id="setupNotice" class="notice" hidden>
         <div>
-          <p class="notice-title">Cloudinary setup needed</p>
+          <p class="notice-title">R2 asset setup needed</p>
           <p>
-            Add your Cloudinary cloud name in <code>assets/js/config.js</code>, then replace the
-            sample public IDs in <code>gallery.json</code>. Until then, image requests are paused.
+            Add your R2 custom domain in <code>assets/js/config.js</code>, then upload image variants
+            with the desktop uploader. Until then, image requests are paused.
           </p>
         </div>
       </section>
@@ -62,7 +62,7 @@
       </div>
     </dialog>
 
-    <script src="./assets/js/config.js?v=20260512-centered-gallery"></script>
-    <script src="./assets/js/app.galleries.js?v=20260512-centered-gallery"></script>
+    <script src="./assets/js/config.js?v=20260513-r2-migration"></script>
+    <script src="./assets/js/app.galleries.js?v=20260513-r2-migration"></script>
   </body>
 </html>

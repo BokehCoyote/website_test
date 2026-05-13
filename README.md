@@ -1,6 +1,6 @@
 # Bokeh Coyote Gallery Test
 
-Plain static GitHub Pages gallery for testing an art portfolio workflow with Cloudinary-hosted images, multi-page comics, YouTube-hosted videos, and local JSON metadata.
+Plain static GitHub Pages gallery for an art portfolio workflow with Cloudflare R2-hosted images, YouTube-hosted videos, and local JSON metadata.
 
 ## Local Preview
 
@@ -14,20 +14,19 @@ Open `http://localhost:4173/`. Do not use `file://`, because the site fetches `g
 
 ## Media Setup
 
-1. Upload optimized artwork masters to Cloudinary.
-2. Copy each Cloudinary public ID.
-3. Replace `replace-with-your-cloud-name` in `assets/js/config.js`.
+1. Create an R2 Standard bucket and attach a custom public domain.
+2. Set `assetBaseUrl` in `assets/js/config.js` to that custom domain, such as `https://assets.example.com`.
+3. Use the desktop uploader to generate `thumb.webp`, `medium.webp`, and `full.webp` variants and upload them to R2.
 4. For videos, upload to YouTube as public or unlisted and copy the video URL or ID.
-5. Replace or add entries in `gallery.json`.
-6. Commit and push. GitHub Pages republishes the static site.
+5. Commit and push. GitHub Pages republishes the static site.
 
-The site generates delivery URLs with `f_auto,q_auto`, lazy loading, and free-form image cards that show the full image in the gallery. Multi-page comics use the first page as the cover and show previous/next controls in the detail modal.
+The site loads pre-generated R2 image variants with lazy loading. Gallery cards use `thumb.webp`, the image view uses `medium.webp`, and the download/open-larger button links to `full.webp`. Multi-page comics use the first page as the cover and show previous/next controls in the detail modal.
 
 YouTube posts render a thumbnail in the gallery and load the `youtube-nocookie.com` embed only when the post is opened.
 
 ## Desktop Uploader
 
-An experimental local Electron uploader lives in `tools/uploader`. It uploads one or more selected local images to Cloudinary or adds YouTube video metadata, appends an entry to `gallery.json`, and commits the JSON change back to GitHub.
+An experimental local Electron uploader lives in `tools/uploader`. It generates WebP image variants, uploads them to R2 through the S3-compatible API, adds YouTube video metadata, appends entries to `gallery.json`, and commits JSON changes back to GitHub.
 
 Run it from Finder by double-clicking `Open Gallery Uploader.command`, or run it locally:
 
@@ -37,25 +36,51 @@ npm install
 npm start
 ```
 
-The uploader stores Cloudinary and GitHub credentials in Electron's local app data directory on your machine. Do not commit API secrets or GitHub tokens. The GitHub token should be a fine-grained personal access token scoped to this repository with Contents read/write access.
+The uploader stores R2 and GitHub credentials in Electron's local app data directory on your machine. Do not commit R2 secrets or GitHub tokens. The GitHub token should be a fine-grained personal access token scoped to this repository with Contents read/write access.
 
 ## `gallery.json` Fields
 
-Image entries should use this shape:
+Image entries use this shape:
 
 ```json
 {
   "id": "night-window-2026",
   "title": "Night Window",
   "gallery": "Main",
-  "uploadedAt": "2026-05-11",
+  "uploadedAt": "2026-05-13",
   "alt": "Digital painting of a lit window at night",
-  "cloudinaryPublicId": "portfolio/paintings/night-window-2026",
+  "mediaType": "image",
+  "assetPath": "artwork/night-window-2026",
   "featured": true
 }
 ```
 
-Keep full artwork files out of GitHub. GitHub should store only the website files and metadata.
+The uploader stores image files in R2 at:
+
+```text
+artwork/{id}/thumb.webp
+artwork/{id}/medium.webp
+artwork/{id}/full.webp
+```
+
+Multi-page comics are image entries with a `pages` array:
+
+```json
+{
+  "id": "comic-title",
+  "title": "Comic Title",
+  "gallery": "Main",
+  "uploadedAt": "2026-05-13",
+  "alt": "Comic title cover page",
+  "mediaType": "image",
+  "assetPath": "artwork/comic-title/pages/01",
+  "pages": [
+    { "assetPath": "artwork/comic-title/pages/01", "alt": "Comic title page 1" },
+    { "assetPath": "artwork/comic-title/pages/02", "alt": "Comic title page 2" }
+  ],
+  "featured": false
+}
+```
 
 Video entries use the same gallery metadata plus YouTube fields:
 
@@ -64,7 +89,7 @@ Video entries use the same gallery metadata plus YouTube fields:
   "id": "video-slug",
   "title": "Video Title",
   "gallery": "Main",
-  "uploadedAt": "2026-05-12",
+  "uploadedAt": "2026-05-13",
   "alt": "Video thumbnail description",
   "mediaType": "video",
   "videoProvider": "youtube",
@@ -74,31 +99,11 @@ Video entries use the same gallery metadata plus YouTube fields:
 }
 ```
 
-Existing image entries do not need `"mediaType"`; the site treats missing media type as `"image"`.
+Set `"hidden": true` to hide an entry from the public site without deleting the R2 objects. The desktop uploader can add or remove this flag from Manage Posts.
 
-Multi-page comics are image entries with a `pages` array. Keep `cloudinaryPublicId` set to the first page for compatibility:
+Supported gallery values are `Main`, `Experimental`, and `NSFW`. Sorting on the website comes from the explicit `gallery` field in `gallery.json`.
 
-```json
-{
-  "id": "comic-title",
-  "title": "Comic Title",
-  "gallery": "Main",
-  "uploadedAt": "2026-05-12",
-  "alt": "Comic title cover page",
-  "cloudinaryPublicId": "Main/comic-title-01",
-  "pages": [
-    { "cloudinaryPublicId": "Main/comic-title-01", "alt": "Comic title page 1" },
-    { "cloudinaryPublicId": "Main/comic-title-02", "alt": "Comic title page 2" }
-  ],
-  "featured": false
-}
-```
-
-Set `"hidden": true` to hide an entry from the public site without deleting the Cloudinary asset. The desktop uploader can add or remove this flag from Manage Posts.
-
-Supported gallery values are `Main`, `Experimental`, and `NSFW`. Cloudinary folders can mirror those names for organization, but sorting on the website comes from the explicit `gallery` field in `gallery.json`.
-
-The NSFW gallery is hidden behind an in-page warning and its images are not inserted into the DOM until the warning is accepted. This is a presentation safeguard, not real access control: public Cloudinary delivery URLs remain public to anyone who has the URL.
+The NSFW gallery is hidden behind an in-page warning and its images are not inserted into the DOM until the warning is accepted. This is a presentation safeguard, not real access control: public R2 delivery URLs remain public to anyone who has the URL.
 
 ## GitHub Pages Deployment
 

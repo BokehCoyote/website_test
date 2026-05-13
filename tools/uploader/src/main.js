@@ -1,13 +1,22 @@
 const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
-const { v2: cloudinary } = require("cloudinary");
+const sharp = require("sharp");
+const { DeleteObjectCommand, PutObjectCommand, S3Client } = require("@aws-sdk/client-s3");
+
+const IMAGE_VARIANTS = [
+  { name: "thumb", fileName: "thumb.webp", max: 600, quality: 82 },
+  { name: "medium", fileName: "medium.webp", max: 1600, quality: 84 },
+  { name: "full", fileName: "full.webp", max: 2600, quality: 88 }
+];
 
 const DEFAULT_SETTINGS = {
-  cloudinary: {
-    cloudName: "dvv9rmejs",
-    apiKey: "",
-    apiSecret: ""
+  r2: {
+    accountId: "",
+    bucketName: "",
+    accessKeyId: "",
+    secretAccessKey: "",
+    assetBaseUrl: "https://assets.example.com"
   },
   github: {
     owner: "BokehCoyote",
@@ -15,19 +24,16 @@ const DEFAULT_SETTINGS = {
     branch: "main",
     galleryPath: "gallery.json",
     token: ""
-  },
-  cloudinaryFolders: {
-    Main: "Main",
-    Experimental: "Experimental",
-    NSFW: "NSFW"
   }
 };
 
 const PUBLIC_SETTINGS = {
-  cloudinary: {
-    cloudName: true,
-    apiKey: true,
-    apiSecret: false
+  r2: {
+    accountId: true,
+    bucketName: true,
+    accessKeyId: true,
+    secretAccessKey: false,
+    assetBaseUrl: true
   },
   github: {
     owner: true,
@@ -35,11 +41,6 @@ const PUBLIC_SETTINGS = {
     branch: true,
     galleryPath: true,
     token: false
-  },
-  cloudinaryFolders: {
-    Main: true,
-    Experimental: true,
-    NSFW: true
   }
 };
 
@@ -112,35 +113,12 @@ function slugify(value) {
     .slice(0, 80);
 }
 
-function cleanSegment(value) {
-  return String(value || "")
-    .trim()
-    .replace(/^\/+|\/+$/g, "")
-    .replace(/[?#\\%<>+]+/g, "-");
+function cleanAssetPath(value) {
+  return String(value || "").trim().replace(/^\/+|\/+$/g, "");
 }
 
-function buildUploadTarget(settings, artwork, filePath, pageIndex = 0, pageCount = 1) {
-  const gallery = artwork.gallery || "Main";
-  const folder = cleanSegment(settings.cloudinaryFolders?.[gallery] || gallery);
-  const base = slugify(artwork.publicId || artwork.id || artwork.title || path.basename(filePath, path.extname(filePath)));
-  if (!base) {
-    throw new Error("A title or public ID is required to name the Cloudinary asset.");
-  }
-  const pageBase = pageCount > 1 ? `${base}-${String(pageIndex + 1).padStart(2, "0")}` : base;
-  return {
-    folder,
-    publicId: folder ? `${folder}/${pageBase}` : pageBase,
-    uploadPublicId: pageBase
-  };
-}
-
-function cloudinaryDeliveryUrl(settings, publicId, transformation) {
-  const cloudName = encodeURIComponent(settings.cloudinary.cloudName || "");
-  const encodedPublicId = String(publicId || "").split("/").map(encodeURIComponent).join("/");
-  if (!cloudName || !encodedPublicId) {
-    return "";
-  }
-  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${encodedPublicId}`;
+function normalizeAssetBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/g, "");
 }
 
 function youtubeThumbnailUrl(videoId) {
@@ -194,98 +172,99 @@ function newestFirst(a, b) {
   return b.index - a.index;
 }
 
-function getEntryPublicIds(item) {
-  const ids = new Set();
-  if (item.cloudinaryPublicId) {
-    ids.add(item.cloudinaryPublicId);
+function getEntryAssetPaths(item) {
+  const paths = new Set();
+  if (item.assetPath) {
+    paths.add(cleanAssetPath(item.assetPath));
   }
   if (Array.isArray(item.pages)) {
     item.pages.forEach((page) => {
-      if (page?.cloudinaryPublicId) {
-        ids.add(page.cloudinaryPublicId);
+      if (page?.assetPath) {
+        paths.add(cleanAssetPath(page.assetPath));
       }
     });
   }
-  return [...ids];
+  return [...paths].filter(Boolean);
 }
 
-function getCoverPublicId(item) {
-  if (Array.isArray(item.pages) && item.pages[0]?.cloudinaryPublicId) {
-    return item.pages[0].cloudinaryPublicId;
+function getCoverAssetPath(item) {
+  if (Array.isArray(item.pages) && item.pages[0]?.assetPath) {
+    return cleanAssetPath(item.pages[0].assetPath);
   }
-  return item.cloudinaryPublicId || "";
+  return cleanAssetPath(item.assetPath);
 }
 
 function getPageCount(item) {
   return Array.isArray(item.pages) && item.pages.length > 0 ? item.pages.length : 1;
 }
 
+function assetUrl(settings, assetPath, fileName) {
+  const baseUrl = normalizeAssetBaseUrl(settings.r2.assetBaseUrl);
+  const encodedPath = cleanAssetPath(assetPath).split("/").map(encodeURIComponent).join("/");
+  return baseUrl && encodedPath ? `${baseUrl}/${encodedPath}/${encodeURIComponent(fileName)}` : "";
+}
+
 function summarizeArtwork(settings, item) {
+  const mediaType = item.mediaType || "image";
   return {
     id: item.id,
     title: item.title || item.id,
     gallery: item.gallery || "Main",
     uploadedAt: item.uploadedAt || "",
-    mediaType: item.mediaType || "image",
+    mediaType,
     videoProvider: item.videoProvider || "",
     youtubeId: item.youtubeId || "",
-    cloudinaryPublicId: item.cloudinaryPublicId || "",
-    cloudinaryPublicIds: item.mediaType === "video" ? [] : getEntryPublicIds(item),
+    assetPath: item.assetPath || "",
+    assetPaths: mediaType === "video" ? [] : getEntryAssetPaths(item),
     posterUrl: item.posterUrl || "",
-    pageCount: item.mediaType === "video" ? 1 : getPageCount(item),
-    thumbnailUrl: item.mediaType === "video"
+    pageCount: mediaType === "video" ? 1 : getPageCount(item),
+    thumbnailUrl: mediaType === "video"
       ? (item.posterUrl || youtubeThumbnailUrl(item.youtubeId))
-      : cloudinaryDeliveryUrl(settings, getCoverPublicId(item), "f_auto,q_auto,c_fill,w_112,h_112"),
+      : assetUrl(settings, getCoverAssetPath(item), "thumb.webp"),
     hidden: Boolean(item.hidden)
   };
 }
 
-function normalizeCloudinaryPublicIds(value) {
-  const ids = String(value || "")
-    .split(/\r?\n|,/)
-    .map((item) => item.trim().replace(/^\/+|\/+$/g, ""))
-    .filter(Boolean);
-  return [...new Set(ids)];
+function imageAssetPath(entryId, pageIndex = 0, pageCount = 1) {
+  return pageCount > 1
+    ? `artwork/${entryId}/pages/${String(pageIndex + 1).padStart(2, "0")}`
+    : `artwork/${entryId}`;
 }
 
-function updateImageSource(item, publicIds, title) {
-  if (!publicIds.length) {
-    throw new Error("At least one Cloudinary public ID is required.");
+function buildImageTargets(artwork, filePaths) {
+  const entryId = artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`);
+  if (!entryId) {
+    throw new Error("A title or custom ID is required to name the R2 asset.");
   }
 
-  const nextItem = { ...item, cloudinaryPublicId: publicIds[0] };
-  if (publicIds.length > 1) {
-    nextItem.pages = publicIds.map((cloudinaryPublicId, index) => ({
-      cloudinaryPublicId,
-      alt: `${title} page ${index + 1}`
-    }));
-  } else {
-    delete nextItem.pages;
-  }
-
-  return nextItem;
-}
-
-function toGalleryEntry(artwork, uploadResults) {
-  const uploadedAt = new Date().toISOString().slice(0, 10);
-  const results = Array.isArray(uploadResults) ? uploadResults : [uploadResults];
-  const pages = results.map((result, index) => ({
-    cloudinaryPublicId: result.public_id,
-    alt: `${artwork.alt || artwork.title} page ${index + 1}`
+  return filePaths.map((filePath, index) => ({
+    filePath,
+    assetPath: imageAssetPath(entryId, index, filePaths.length),
+    alt: filePaths.length > 1 ? `${artwork.alt || artwork.title} page ${index + 1}` : artwork.alt || artwork.title
   }));
+}
 
+function imageEntryFromTargets(artwork, targets, uploadedAt = new Date().toISOString().slice(0, 10)) {
   const entry = {
     id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
     title: artwork.title,
     gallery: artwork.gallery || "Main",
     uploadedAt,
     alt: artwork.alt || artwork.title,
-    cloudinaryPublicId: results[0].public_id,
+    mediaType: "image",
+    assetPath: targets[0].assetPath,
     featured: Boolean(artwork.featured)
   };
 
-  if (pages.length > 1) {
-    entry.pages = pages;
+  if (targets.length > 1) {
+    entry.pages = targets.map((target) => ({
+      assetPath: target.assetPath,
+      alt: target.alt
+    }));
+  }
+
+  if (artwork.hidden) {
+    entry.hidden = true;
   }
 
   return entry;
@@ -311,6 +290,95 @@ function toVideoGalleryEntry(video) {
     posterUrl: String(video.posterUrl || "").trim(),
     featured: Boolean(video.featured)
   };
+}
+
+function requireR2Settings(settings) {
+  requireValue(settings.r2.accountId, "R2 account ID");
+  requireValue(settings.r2.bucketName, "R2 bucket name");
+  requireValue(settings.r2.accessKeyId, "R2 access key ID");
+  requireValue(settings.r2.secretAccessKey, "R2 secret access key");
+  requireValue(settings.r2.assetBaseUrl, "R2 asset base URL");
+}
+
+function createR2Client(settings) {
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${settings.r2.accountId}.r2.cloudflarestorage.com`,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: settings.r2.accessKeyId,
+      secretAccessKey: settings.r2.secretAccessKey
+    }
+  });
+}
+
+async function renderVariant(filePath, variant) {
+  const { data, info } = await sharp(filePath, { limitInputPixels: false })
+    .rotate()
+    .toColorspace("srgb")
+    .resize({
+      width: variant.max,
+      height: variant.max,
+      fit: "inside",
+      withoutEnlargement: true
+    })
+    .webp({ quality: variant.quality, effort: 5 })
+    .toBuffer({ resolveWithObject: true });
+
+  return {
+    name: variant.name,
+    fileName: variant.fileName,
+    buffer: data,
+    width: info.width,
+    height: info.height,
+    bytes: data.length
+  };
+}
+
+async function uploadImageTargets(settings, targets) {
+  const client = createR2Client(settings);
+  const pages = [];
+
+  for (const target of targets) {
+    const variants = [];
+    for (const variant of IMAGE_VARIANTS) {
+      const rendered = await renderVariant(target.filePath, variant);
+      const key = `${target.assetPath}/${variant.fileName}`;
+      await client.send(new PutObjectCommand({
+        Bucket: settings.r2.bucketName,
+        Key: key,
+        Body: rendered.buffer,
+        ContentType: "image/webp",
+        CacheControl: "public, max-age=31536000, immutable"
+      }));
+      variants.push({ ...rendered, key, buffer: undefined });
+    }
+    pages.push({ assetPath: target.assetPath, variants });
+  }
+
+  return pages;
+}
+
+async function deleteAssetPaths(settings, assetPaths) {
+  if (!assetPaths.length) {
+    return [];
+  }
+
+  const client = createR2Client(settings);
+  const deleted = [];
+
+  for (const assetPath of assetPaths) {
+    for (const variant of IMAGE_VARIANTS) {
+      const key = `${assetPath}/${variant.fileName}`;
+      await client.send(new DeleteObjectCommand({
+        Bucket: settings.r2.bucketName,
+        Key: key
+      }));
+      deleted.push(key);
+    }
+  }
+
+  return deleted;
 }
 
 async function githubRequest(settings, url, options = {}) {
@@ -374,6 +442,14 @@ async function commitGallery(settings, encodedPath, sha, gallery, message) {
   });
 }
 
+function requireGithubSettings(settings) {
+  requireValue(settings.github.owner, "GitHub owner");
+  requireValue(settings.github.repo, "GitHub repo");
+  requireValue(settings.github.branch, "GitHub branch");
+  requireValue(settings.github.galleryPath, "GitHub gallery path");
+  requireValue(settings.github.token, "GitHub token");
+}
+
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1180,
@@ -413,13 +489,16 @@ ipcMain.handle("settings:save", async (_event, incoming) => {
   const current = await readSettings();
   const next = deepMerge(current, incoming);
 
-  if (incoming?.cloudinary?.apiSecret === "saved") {
-    next.cloudinary.apiSecret = current.cloudinary.apiSecret;
+  if (incoming?.r2?.secretAccessKey === "saved") {
+    next.r2.secretAccessKey = current.r2.secretAccessKey;
   }
   if (incoming?.github?.token === "saved") {
     next.github.token = current.github.token;
   }
 
+  next.r2.assetBaseUrl = normalizeAssetBaseUrl(next.r2.assetBaseUrl);
+  delete next[["cloud", "inary"].join("")];
+  delete next[["cloud", "inaryFolders"].join("")];
   return redactSettings(await writeSettings(next));
 });
 
@@ -465,86 +544,36 @@ ipcMain.handle("artwork:upload", async (_event, payload) => {
   if (filePaths.length === 0) {
     throw new Error("Image file is required.");
   }
-  requireValue(settings.cloudinary.cloudName, "Cloudinary cloud name");
-  requireValue(settings.cloudinary.apiKey, "Cloudinary API key");
-  requireValue(settings.cloudinary.apiSecret, "Cloudinary API secret");
-  requireValue(settings.github.owner, "GitHub owner");
-  requireValue(settings.github.repo, "GitHub repo");
-  requireValue(settings.github.branch, "GitHub branch");
-  requireValue(settings.github.galleryPath, "GitHub gallery path");
-  requireValue(settings.github.token, "GitHub token");
+  requireR2Settings(settings);
+  requireGithubSettings(settings);
   requireValue(artwork.title, "Title");
   requireValue(artwork.gallery, "Gallery");
 
-  cloudinary.config({
-    cloud_name: settings.cloudinary.cloudName,
-    api_key: settings.cloudinary.apiKey,
-    api_secret: settings.cloudinary.apiSecret,
-    secure: true
-  });
-
-  const uploadTargets = filePaths.map((filePath, index) => buildUploadTarget(settings, artwork, filePath, index, filePaths.length));
-  const entryDraft = {
-    id: artwork.id || slugify(`${artwork.gallery || "main"}-${artwork.title}`),
-    cloudinaryPublicIds: uploadTargets.map((target) => target.publicId)
-  };
+  const targets = buildImageTargets(artwork, filePaths);
+  const entry = imageEntryFromTargets(artwork, targets);
   const { file, gallery, encodedPath } = await fetchGallery(settings);
 
-  if (gallery.some((item) => item.id === entryDraft.id)) {
-    throw new Error(`gallery.json already contains id "${entryDraft.id}". Use a unique title or custom ID.`);
+  if (gallery.some((item) => item.id === entry.id)) {
+    throw new Error(`gallery.json already contains id "${entry.id}". Use a unique title or custom ID.`);
   }
 
-  const existingPublicIds = new Set(gallery.flatMap(getEntryPublicIds));
-  const duplicatePublicId = entryDraft.cloudinaryPublicIds.find((publicId) => existingPublicIds.has(publicId));
-  if (duplicatePublicId) {
-    throw new Error(`gallery.json already contains public ID "${duplicatePublicId}".`);
+  const existingAssetPaths = new Set(gallery.flatMap(getEntryAssetPaths));
+  const duplicateAssetPath = getEntryAssetPaths(entry).find((assetPath) => existingAssetPaths.has(assetPath));
+  if (duplicateAssetPath) {
+    throw new Error(`gallery.json already contains asset path "${duplicateAssetPath}".`);
   }
 
-  const uploadResults = [];
-  for (const [index, filePath] of filePaths.entries()) {
-    const uploadTarget = uploadTargets[index];
-    const uploadResult = await cloudinary.uploader.upload(filePath, {
-      resource_type: "image",
-      public_id: uploadTarget.uploadPublicId,
-      folder: uploadTarget.folder || undefined,
-      asset_folder: uploadTarget.folder || undefined,
-      overwrite: false,
-      use_filename: false,
-      unique_filename: false,
-      tags: ["portfolio", artwork.gallery, filePaths.length > 1 ? "comic" : ""].filter(Boolean),
-      context: {
-        title: artwork.title,
-        alt: filePaths.length > 1 ? `${artwork.alt || artwork.title} page ${index + 1}` : artwork.alt || artwork.title,
-        gallery: artwork.gallery,
-        page: String(index + 1),
-        page_count: String(filePaths.length)
-      }
-    });
-    uploadResults.push(uploadResult);
-  }
-
-  const entry = toGalleryEntry(artwork, uploadResults);
+  const pages = await uploadImageTargets(settings, targets);
   const nextGallery = [...gallery, entry];
   const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `Add ${entry.title} to gallery`);
 
   return {
     entry,
-    cloudinary: {
-      publicId: uploadResults[0].public_id,
-      secureUrl: uploadResults[0].secure_url,
-      width: uploadResults[0].width,
-      height: uploadResults[0].height,
-      bytes: uploadResults.reduce((sum, result) => sum + (result.bytes || 0), 0),
-      format: uploadResults[0].format,
-      pageCount: uploadResults.length,
-      pages: uploadResults.map((result) => ({
-        publicId: result.public_id,
-        secureUrl: result.secure_url,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes,
-        format: result.format
-      }))
+    image: {
+      assetPath: entry.assetPath,
+      pageCount: pages.length,
+      pages,
+      bytes: pages.reduce((sum, page) => sum + page.variants.reduce((pageSum, variant) => pageSum + variant.bytes, 0), 0)
     },
     github: {
       commitSha: commit.commit?.sha,
@@ -557,11 +586,7 @@ ipcMain.handle("video:add", async (_event, payload) => {
   const settings = await readSettings();
   const video = payload?.video || {};
 
-  requireValue(settings.github.owner, "GitHub owner");
-  requireValue(settings.github.repo, "GitHub repo");
-  requireValue(settings.github.branch, "GitHub branch");
-  requireValue(settings.github.galleryPath, "GitHub gallery path");
-  requireValue(settings.github.token, "GitHub token");
+  requireGithubSettings(settings);
   requireValue(video.title, "Title");
   requireValue(video.gallery, "Gallery");
   requireValue(video.youtubeUrl || video.youtubeId, "YouTube URL or video ID");
@@ -595,12 +620,7 @@ ipcMain.handle("video:add", async (_event, payload) => {
 
 ipcMain.handle("artwork:list", async () => {
   const settings = await readSettings();
-
-  requireValue(settings.github.owner, "GitHub owner");
-  requireValue(settings.github.repo, "GitHub repo");
-  requireValue(settings.github.branch, "GitHub branch");
-  requireValue(settings.github.galleryPath, "GitHub gallery path");
-  requireValue(settings.github.token, "GitHub token");
+  requireGithubSettings(settings);
 
   const { gallery } = await fetchGallery(settings);
   return gallery
@@ -615,11 +635,7 @@ ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
   const hidden = Boolean(payload?.hidden);
 
   requireValue(id, "Artwork ID");
-  requireValue(settings.github.owner, "GitHub owner");
-  requireValue(settings.github.repo, "GitHub repo");
-  requireValue(settings.github.branch, "GitHub branch");
-  requireValue(settings.github.galleryPath, "GitHub gallery path");
-  requireValue(settings.github.token, "GitHub token");
+  requireGithubSettings(settings);
 
   const { file, gallery, encodedPath } = await fetchGallery(settings);
   const index = gallery.findIndex((item) => item.id === id);
@@ -654,13 +670,10 @@ ipcMain.handle("artwork:update", async (_event, payload) => {
   const settings = await readSettings();
   const id = payload?.id;
   const updates = payload?.updates || {};
+  const filePaths = Array.isArray(payload?.filePaths) ? payload.filePaths.filter(Boolean) : [];
 
   requireValue(id, "Artwork ID");
-  requireValue(settings.github.owner, "GitHub owner");
-  requireValue(settings.github.repo, "GitHub repo");
-  requireValue(settings.github.branch, "GitHub branch");
-  requireValue(settings.github.galleryPath, "GitHub gallery path");
-  requireValue(settings.github.token, "GitHub token");
+  requireGithubSettings(settings);
 
   const { file, gallery, encodedPath } = await fetchGallery(settings);
   const index = gallery.findIndex((item) => item.id === id);
@@ -674,6 +687,8 @@ ipcMain.handle("artwork:update", async (_event, payload) => {
   requireValue(title, "Title");
 
   let nextItem = { ...item, title };
+  let imageResult = null;
+  let deletedKeys = [];
 
   if (item.mediaType === "video") {
     const youtubeId = parseYouTubeId(updates.youtubeUrl || updates.youtubeId || item.youtubeId);
@@ -692,14 +707,48 @@ ipcMain.handle("artwork:update", async (_event, payload) => {
     nextItem.youtubeId = youtubeId;
     nextItem.posterUrl = String(updates.posterUrl || "").trim();
     nextItem.videoProvider = "youtube";
-  } else {
-    const publicIds = normalizeCloudinaryPublicIds(updates.cloudinaryPublicIds || updates.cloudinaryPublicId);
-    const existingIds = gallery.flatMap((entry, entryIndex) => (entryIndex === index ? [] : getEntryPublicIds(entry)));
-    const duplicatePublicId = publicIds.find((publicId) => existingIds.includes(publicId));
-    if (duplicatePublicId) {
-      throw new Error(`gallery.json already contains public ID "${duplicatePublicId}".`);
-    }
-    nextItem = updateImageSource(nextItem, publicIds, title);
+  } else if (filePaths.length > 0) {
+    requireR2Settings(settings);
+    const oldAssetPaths = getEntryAssetPaths(item);
+    const targets = buildImageTargets({
+      id: item.id,
+      title,
+      gallery: item.gallery || "Main",
+      alt: updates.alt || title,
+      featured: Boolean(item.featured),
+      hidden: Boolean(item.hidden)
+    }, filePaths);
+    const pages = await uploadImageTargets(settings, targets);
+    nextItem = imageEntryFromTargets({
+      id: item.id,
+      title,
+      gallery: item.gallery || "Main",
+      alt: updates.alt || title,
+      featured: Boolean(item.featured),
+      hidden: Boolean(item.hidden)
+    }, targets);
+    const nextAssetPaths = new Set(getEntryAssetPaths(nextItem));
+    const staleAssetPaths = oldAssetPaths.filter((assetPath) => !nextAssetPaths.has(assetPath));
+    imageResult = {
+      assetPath: nextItem.assetPath,
+      pageCount: pages.length,
+      pages,
+      bytes: pages.reduce((sum, page) => sum + page.variants.reduce((pageSum, variant) => pageSum + variant.bytes, 0), 0)
+    };
+
+    const nextGallery = gallery.map((entry, entryIndex) => (entryIndex === index ? nextItem : entry));
+    const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `Update ${title}`);
+    deletedKeys = await deleteAssetPaths(settings, staleAssetPaths);
+
+    return {
+      item: summarizeArtwork(settings, nextItem),
+      image: imageResult,
+      deletedKeys,
+      github: {
+        commitSha: commit.commit?.sha,
+        htmlUrl: commit.commit?.html_url || commit.content?.html_url
+      }
+    };
   }
 
   if (!nextItem.alt || nextItem.alt === item.title) {
@@ -711,6 +760,8 @@ ipcMain.handle("artwork:update", async (_event, payload) => {
 
   return {
     item: summarizeArtwork(settings, nextItem),
+    image: imageResult,
+    deletedKeys,
     github: {
       commitSha: commit.commit?.sha,
       htmlUrl: commit.commit?.html_url || commit.content?.html_url

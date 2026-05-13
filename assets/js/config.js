@@ -1,3 +1,3 @@
 window.PORTFOLIO_CONFIG = {
-  cloudinaryCloudName: "dvv9rmejs"
+  assetBaseUrl: "https://assets.example.com"
 };

@@ -18,7 +18,7 @@ const elements = {
   postList: $("#postList"),
   statusLog: $("#statusLog"),
   result: $("#result"),
-  resultPublicId: $("#resultPublicId"),
+  resultAssetPath: $("#resultAssetPath"),
   resultCommit: $("#resultCommit")
 };
 
@@ -47,10 +47,12 @@ function toSlug(value) {
 }
 
 function setFormFromSettings(nextSettings) {
-  $("#cloudName").value = nextSettings.cloudinary.cloudName || "";
-  $("#apiKey").value = nextSettings.cloudinary.apiKey === "saved" ? "" : nextSettings.cloudinary.apiKey || "";
-  $("#apiSecret").value = "";
-  $("#apiSecret").placeholder = nextSettings.cloudinary.apiSecret === "saved" ? "Saved locally" : "";
+  $("#r2AccountId").value = nextSettings.r2.accountId || "";
+  $("#r2BucketName").value = nextSettings.r2.bucketName || "";
+  $("#r2AccessKeyId").value = nextSettings.r2.accessKeyId === "saved" ? "" : nextSettings.r2.accessKeyId || "";
+  $("#r2SecretAccessKey").value = "";
+  $("#r2SecretAccessKey").placeholder = nextSettings.r2.secretAccessKey === "saved" ? "Saved locally" : "";
+  $("#assetBaseUrl").value = nextSettings.r2.assetBaseUrl || "";
 
   $("#owner").value = nextSettings.github.owner || "";
   $("#repo").value = nextSettings.github.repo || "";
@@ -59,9 +61,6 @@ function setFormFromSettings(nextSettings) {
   $("#token").value = "";
   $("#token").placeholder = nextSettings.github.token === "saved" ? "Saved locally" : "";
 
-  $("#folderMain").value = nextSettings.cloudinaryFolders.Main || "Main";
-  $("#folderExperimental").value = nextSettings.cloudinaryFolders.Experimental || "Experimental";
-  $("#folderNsfw").value = nextSettings.cloudinaryFolders.NSFW || "NSFW";
 }
 
 async function loadSettings() {
@@ -71,10 +70,12 @@ async function loadSettings() {
 
 function readSettingsForm() {
   return {
-    cloudinary: {
-      cloudName: $("#cloudName").value.trim(),
-      apiKey: $("#apiKey").value.trim() || settings.cloudinary.apiKey,
-      apiSecret: $("#apiSecret").value || settings.cloudinary.apiSecret
+    r2: {
+      accountId: $("#r2AccountId").value.trim(),
+      bucketName: $("#r2BucketName").value.trim(),
+      accessKeyId: $("#r2AccessKeyId").value.trim() || settings.r2.accessKeyId,
+      secretAccessKey: $("#r2SecretAccessKey").value || settings.r2.secretAccessKey,
+      assetBaseUrl: $("#assetBaseUrl").value.trim()
     },
     github: {
       owner: $("#owner").value.trim(),
@@ -82,11 +83,6 @@ function readSettingsForm() {
       branch: $("#branch").value.trim(),
       galleryPath: $("#galleryPath").value.trim(),
       token: $("#token").value || settings.github.token
-    },
-    cloudinaryFolders: {
-      Main: $("#folderMain").value.trim(),
-      Experimental: $("#folderExperimental").value.trim(),
-      NSFW: $("#folderNsfw").value.trim()
     }
   };
 }
@@ -98,8 +94,7 @@ function readArtworkForm() {
     id: $("#id").value.trim() || toSlug(`${$("#gallery").value}-${title}`),
     gallery: $("#gallery").value,
     alt: $("#alt").value.trim() || title,
-    featured: $("#featured").checked,
-    publicId: $("#publicId").value.trim()
+    featured: $("#featured").checked
   };
 }
 
@@ -145,17 +140,14 @@ function renderPosts(posts) {
 }
 
 function sourceLabel(post) {
-  return post.mediaType === "video" ? "YouTube URL or ID" : "Cloudinary public ID(s)";
+  return post.mediaType === "video" ? "YouTube URL or ID" : "R2 asset path";
 }
 
 function sourceValue(post) {
   if (post.mediaType === "video") {
     return post.youtubeId || "";
   }
-  const ids = Array.isArray(post.cloudinaryPublicIds) && post.cloudinaryPublicIds.length
-    ? post.cloudinaryPublicIds
-    : [post.cloudinaryPublicId].filter(Boolean);
-  return ids.join("\n");
+  return post.assetPath || "";
 }
 
 function createPostRow(post) {
@@ -192,12 +184,12 @@ function createPostRow(post) {
     post.hidden ? "Hidden" : "Visible"
   ].filter(Boolean).join(" - ");
 
-  const publicId = document.createElement("small");
-  publicId.textContent = post.mediaType === "video"
+  const source = document.createElement("small");
+  source.textContent = post.mediaType === "video"
     ? `YouTube ${post.youtubeId || post.id}`
-    : (post.cloudinaryPublicId || post.id);
+    : (post.assetPath || post.id);
 
-  details.append(title, meta, publicId);
+  details.append(title, meta, source);
 
   const actions = document.createElement("div");
   actions.className = "post-actions";
@@ -221,6 +213,7 @@ function createPostRow(post) {
 
 function renderPostEditor(row, post) {
   row.classList.add("is-editing");
+  let replacementFiles = [];
 
   const form = document.createElement("form");
   form.className = "post-edit-form";
@@ -235,20 +228,21 @@ function renderPostEditor(row, post) {
   titleInput.value = post.title || "";
   titleField.append(titleLabel, titleInput);
 
-  const sourceField = document.createElement("label");
-  sourceField.className = "field";
-  const sourceFieldLabel = document.createElement("span");
-  sourceFieldLabel.textContent = sourceLabel(post);
-  const sourceInput = document.createElement("textarea");
-  sourceInput.name = "source";
-  sourceInput.rows = post.mediaType === "video" ? 2 : Math.max(2, Math.min(Number(post.pageCount) || 1, 5));
-  sourceInput.required = true;
-  sourceInput.value = sourceValue(post);
-  sourceField.append(sourceFieldLabel, sourceInput);
-
-  form.append(titleField, sourceField);
+  form.append(titleField);
 
   if (post.mediaType === "video") {
+    const sourceField = document.createElement("label");
+    sourceField.className = "field";
+    const sourceFieldLabel = document.createElement("span");
+    sourceFieldLabel.textContent = sourceLabel(post);
+    const sourceInput = document.createElement("textarea");
+    sourceInput.name = "source";
+    sourceInput.rows = 2;
+    sourceInput.required = true;
+    sourceInput.value = sourceValue(post);
+    sourceField.append(sourceFieldLabel, sourceInput);
+    form.append(sourceField);
+
     const posterField = document.createElement("label");
     posterField.className = "field";
     const posterLabel = document.createElement("span");
@@ -259,6 +253,39 @@ function renderPostEditor(row, post) {
     posterInput.value = post.posterUrl || "";
     posterField.append(posterLabel, posterInput);
     form.append(posterField);
+  } else {
+    const assetField = document.createElement("label");
+    assetField.className = "field";
+    const assetLabel = document.createElement("span");
+    assetLabel.textContent = sourceLabel(post);
+    const assetInput = document.createElement("input");
+    assetInput.value = sourceValue(post);
+    assetInput.readOnly = true;
+    assetField.append(assetLabel, assetInput);
+
+    const replacementButton = document.createElement("button");
+    replacementButton.type = "button";
+    replacementButton.className = "file-picker";
+    const replacementTitle = document.createElement("strong");
+    replacementTitle.textContent = "Choose replacement image(s)";
+    const replacementSummary = document.createElement("small");
+    replacementSummary.textContent = "Leave blank to keep current R2 files";
+    replacementButton.append(replacementTitle, replacementSummary);
+    replacementButton.addEventListener("click", async () => {
+      const selection = await window.galleryUploader.chooseImage();
+      if (!selection) return;
+
+      replacementFiles = selection.files || [{
+        path: selection.path,
+        name: selection.name,
+        size: selection.size
+      }];
+      replacementSummary.textContent = replacementFiles.length === 1
+        ? `${replacementFiles[0].name} - ${formatBytes(replacementFiles[0].size)}`
+        : `${replacementFiles.length} images selected - ${formatBytes(selection.size)}`;
+    });
+
+    form.append(assetField, replacementButton);
   }
 
   const actions = document.createElement("div");
@@ -291,10 +318,10 @@ function renderPostEditor(row, post) {
     };
 
     if (post.mediaType === "video") {
-      payload.updates.youtubeUrl = sourceInput.value.trim();
+      payload.updates.youtubeUrl = form.elements.source.value.trim();
       payload.updates.posterUrl = form.elements.posterUrl.value.trim();
-    } else {
-      payload.updates.cloudinaryPublicIds = sourceInput.value;
+    } else if (replacementFiles.length > 0) {
+      payload.filePaths = replacementFiles.map((file) => file.path);
     }
 
     try {
@@ -399,8 +426,8 @@ elements.artworkForm.addEventListener("submit", async (event) => {
   }
 
   elements.submitButton.disabled = true;
-  elements.submitButton.textContent = isVideo ? "Committing..." : "Uploading...";
-  log(isVideo ? "Adding YouTube metadata to gallery.json." : `Uploading ${selectedFiles.length} image${selectedFiles.length === 1 ? "" : "s"} to Cloudinary.`);
+  elements.submitButton.textContent = isVideo ? "Committing..." : "Generating...";
+  log(isVideo ? "Adding YouTube metadata to gallery.json." : `Generating WebP variants and uploading ${selectedFiles.length} image${selectedFiles.length === 1 ? "" : "s"} to R2.`);
 
   try {
     const result = isVideo
@@ -412,10 +439,10 @@ elements.artworkForm.addEventListener("submit", async (event) => {
       });
 
     elements.result.hidden = false;
-    elements.resultPublicId.textContent = result.youtube?.id || result.cloudinary?.publicId || result.entry.id;
+    elements.resultAssetPath.textContent = result.youtube?.id || result.image?.assetPath || result.entry.id;
     elements.resultCommit.textContent = result.github.commitSha || "View commit";
     elements.resultCommit.href = result.github.htmlUrl || "#";
-    log(`Committed ${result.entry.title}${result.cloudinary?.pageCount > 1 ? ` (${result.cloudinary.pageCount} pages)` : ""} to gallery.json.`, "success");
+    log(`Committed ${result.entry.title}${result.image?.pageCount > 1 ? ` (${result.image.pageCount} pages)` : ""} to gallery.json.`, "success");
     await loadPosts();
   } catch (error) {
     log(error.message, "error");

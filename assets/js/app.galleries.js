@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-centered-gallery";
+  const ASSET_VERSION = "20260513-r2-migration";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -7,11 +7,12 @@
     { key: "experimental", label: "Experimental", icon: "./assets/icons/experimental-triangle.svg" },
     { key: "nsfw", label: "NSFW", icon: "./assets/icons/nsfw-18-plus.svg" }
   ];
-  const PLACEHOLDER_CLOUD_NAMES = new Set([
+  const PLACEHOLDER_ASSET_BASE_URLS = new Set([
     "",
-    "replace-with-your-cloud-name",
-    "your-cloud-name",
-    "__cloudinary_cloud_name__"
+    "https://assets.example.com",
+    "http://assets.example.com",
+    "assets.example.com",
+    "__asset_base_url__"
   ]);
 
   const state = {
@@ -97,7 +98,7 @@
       videoProvider: cleanText(item.videoProvider, "").toLowerCase(),
       youtubeId: cleanText(item.youtubeId, ""),
       posterUrl: cleanText(item.posterUrl, ""),
-      cloudinaryPublicId: cleanText(item.cloudinaryPublicId, coverPage?.cloudinaryPublicId || ""),
+      assetPath: cleanAssetPath(item.assetPath || coverPage?.assetPath || ""),
       pages,
       featured: Boolean(item.featured)
     };
@@ -108,12 +109,12 @@
     const pages = rawPages
       .map((page, index) => {
         const isObject = page && typeof page === "object";
-        const cloudinaryPublicId = cleanText(isObject ? page.cloudinaryPublicId : page, "");
-        if (!cloudinaryPublicId) {
+        const assetPath = cleanAssetPath(isObject ? page.assetPath : page);
+        if (!assetPath) {
           return null;
         }
         return {
-          cloudinaryPublicId,
+          assetPath,
           alt: cleanText(isObject ? page.alt : "", `${title} page ${index + 1}`)
         };
       })
@@ -123,9 +124,9 @@
       return pages;
     }
 
-    const cloudinaryPublicId = cleanText(item.cloudinaryPublicId, "");
-    return cloudinaryPublicId ? [{
-      cloudinaryPublicId,
+    const assetPath = cleanAssetPath(item.assetPath);
+    return assetPath ? [{
+      assetPath,
       alt: cleanText(item.alt, `${title} artwork image`)
     }] : [];
   }
@@ -139,7 +140,7 @@
   }
 
   function renderSetupNotice() {
-    elements.setupNotice.hidden = hasCloudinaryConfig();
+    elements.setupNotice.hidden = hasAssetConfig();
   }
 
   function renderNsfwPrompt() {
@@ -248,23 +249,17 @@
     }
 
     const coverPage = getArtworkPage(artwork, 0);
-    if (!canRenderCloudinaryPage(coverPage)) {
-      return createImagePlaceholder("Cloudinary preview paused");
+    if (!canRenderAssetPage(coverPage)) {
+      return createImagePlaceholder("R2 preview paused");
     }
 
     const image = document.createElement("img");
-    image.src = cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_640");
-    image.srcset = [
-      `${cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_420")} 420w`,
-      `${cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_640")} 640w`,
-      `${cloudinaryUrl(coverPage.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_900")} 900w`
-    ].join(", ");
-    image.sizes = "(min-width: 980px) 31vw, (min-width: 680px) 46vw, 92vw";
+    image.src = assetUrl(coverPage.assetPath, "thumb.webp");
     image.alt = coverPage.alt;
     image.loading = "lazy";
     image.decoding = "async";
     image.addEventListener("error", () => {
-      image.replaceWith(createImagePlaceholder("Image not found in Cloudinary"));
+      image.replaceWith(createImagePlaceholder("Image not found in R2"));
     }, { once: true });
     return image;
   }
@@ -333,9 +328,9 @@
     const page = getArtworkPage(artwork, state.activePageIndex);
     elements.dialogAlt.textContent = page?.alt || artwork.alt;
 
-    if (canRenderCloudinaryPage(page)) {
+    if (canRenderAssetPage(page)) {
       const label = isComic(artwork) ? `Open page ${state.activePageIndex + 1} of ${artwork.title}` : `Open larger image for ${artwork.title}`;
-      setFullLink(cloudinaryUrl(page.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_2600"), label);
+      setFullLink(assetUrl(page.assetPath, "full.webp"), label);
     } else {
       elements.dialogFullLink.hidden = true;
     }
@@ -355,19 +350,19 @@
     }
 
     const page = getArtworkPage(artwork, state.activePageIndex);
-    if (!canRenderCloudinaryPage(page)) {
-      return createImagePlaceholder("Add Cloudinary config to load detail image");
+    if (!canRenderAssetPage(page)) {
+      return createImagePlaceholder("Add R2 asset config to load detail image");
     }
 
     const wrapper = document.createElement("div");
     wrapper.className = "comic-reader";
 
     const image = document.createElement("img");
-    image.src = cloudinaryUrl(page.cloudinaryPublicId, "f_auto,q_auto,c_limit,w_1800");
+    image.src = assetUrl(page.assetPath, "medium.webp");
     image.alt = page.alt;
     image.decoding = "async";
     image.addEventListener("error", () => {
-      image.replaceWith(createImagePlaceholder("Detail image not found in Cloudinary"));
+      image.replaceWith(createImagePlaceholder("Detail image not found in R2"));
     }, { once: true });
     image.addEventListener("click", () => elements.dialog.close());
     wrapper.append(image);
@@ -599,13 +594,13 @@
     return state.gallery === NSFW_GALLERY && !state.nsfwAccepted;
   }
 
-  function hasCloudinaryConfig() {
-    const cloudName = getCloudName();
-    return !PLACEHOLDER_CLOUD_NAMES.has(cloudName.toLowerCase());
+  function hasAssetConfig() {
+    const assetBaseUrl = getAssetBaseUrl();
+    return !PLACEHOLDER_ASSET_BASE_URLS.has(assetBaseUrl.toLowerCase());
   }
 
-  function canRenderCloudinaryPage(page) {
-    return hasCloudinaryConfig() && Boolean(page?.cloudinaryPublicId);
+  function canRenderAssetPage(page) {
+    return hasAssetConfig() && Boolean(page?.assetPath);
   }
 
   function isYoutubeVideo(artwork) {
@@ -669,15 +664,18 @@
     return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   }
 
-  function cloudinaryUrl(publicId, transformation) {
-    const cloudName = encodeURIComponent(getCloudName());
-    const encodedPublicId = publicId.split("/").map(encodeURIComponent).join("/");
-    return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${encodedPublicId}`;
+  function assetUrl(assetPath, fileName) {
+    const encodedPath = assetPath.split("/").map(encodeURIComponent).join("/");
+    return `${getAssetBaseUrl()}/${encodedPath}/${encodeURIComponent(fileName)}`;
   }
 
-  function getCloudName() {
+  function getAssetBaseUrl() {
     const config = window.PORTFOLIO_CONFIG || {};
-    return cleanText(config.cloudinaryCloudName, "");
+    return cleanText(config.assetBaseUrl, "").replace(/\/+$/g, "");
+  }
+
+  function cleanAssetPath(value) {
+    return cleanText(value, "").replace(/^\/+|\/+$/g, "");
   }
 
   function cleanText(value, fallback) {

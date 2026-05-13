@@ -11,7 +11,7 @@
       <section class="panel upload-panel">
         <div class="eyebrow">Bokeh Coyote</div>
         <h1>Gallery Uploader</h1>
-        <p class="lede">Upload optimized artwork masters to Cloudinary or add YouTube video metadata to the GitHub Pages gallery.</p>
+        <p class="lede">Generate WebP artwork variants, upload them to Cloudflare R2, or add YouTube video metadata to the GitHub Pages gallery.</p>
 
         <button class="secondary" id="settingsToggle" type="button">Settings</button>
 
@@ -66,11 +66,6 @@
             <span>Feature first in its gallery</span>
           </label>
 
-          <label class="field media-field image-field">
-            <span>Cloudinary public ID slug</span>
-            <input id="publicId" name="publicId" placeholder="auto from title if blank" autocomplete="off">
-          </label>
-
           <label class="field media-field video-field" hidden>
             <span>Poster URL</span>
             <input id="posterUrl" name="posterUrl" placeholder="optional; YouTube thumbnail used if blank" autocomplete="off">
@@ -102,8 +97,8 @@
         <section class="result" id="result" hidden>
           <h3>Last Upload</h3>
           <dl>
-            <dt>Asset ID</dt>
-            <dd id="resultPublicId"></dd>
+              <dt>Asset Path</dt>
+            <dd id="resultAssetPath"></dd>
             <dt>GitHub Commit</dt>
             <dd><a id="resultCommit" href="#" target="_blank" rel="noreferrer"></a></dd>
           </dl>
@@ -123,18 +118,26 @@
 
         <div class="settings-grid">
           <fieldset>
-            <legend>Cloudinary</legend>
+            <legend>Cloudflare R2</legend>
             <label class="field">
-              <span>Cloud name</span>
-              <input id="cloudName" name="cloudName" required>
+              <span>Account ID</span>
+              <input id="r2AccountId" name="r2AccountId" autocomplete="off" required>
             </label>
             <label class="field">
-              <span>API key</span>
-              <input id="apiKey" name="apiKey" autocomplete="off" required>
+              <span>Bucket name</span>
+              <input id="r2BucketName" name="r2BucketName" autocomplete="off" required>
             </label>
             <label class="field">
-              <span>API secret</span>
-              <input id="apiSecret" name="apiSecret" type="password" autocomplete="off" required>
+              <span>Access key ID</span>
+              <input id="r2AccessKeyId" name="r2AccessKeyId" autocomplete="off" required>
+            </label>
+            <label class="field">
+              <span>Secret access key</span>
+              <input id="r2SecretAccessKey" name="r2SecretAccessKey" type="password" autocomplete="off" required>
+            </label>
+            <label class="field">
+              <span>Asset base URL</span>
+              <input id="assetBaseUrl" name="assetBaseUrl" placeholder="https://assets.example.com" autocomplete="off" required>
             </label>
           </fieldset>
 
@@ -162,23 +165,6 @@
             </label>
           </fieldset>
 
-          <fieldset class="span-2">
-            <legend>Cloudinary folders</legend>
-            <div class="folder-grid">
-              <label class="field">
-                <span>Main</span>
-                <input id="folderMain" name="folderMain">
-              </label>
-              <label class="field">
-                <span>Experimental</span>
-                <input id="folderExperimental" name="folderExperimental">
-              </label>
-              <label class="field">
-                <span>NSFW</span>
-                <input id="folderNsfw" name="folderNsfw">
-              </label>
-            </div>
-          </fieldset>
         </div>
 
         <footer class="dialog-actions">

@@ -19,6 +19,7 @@ for (const file of required) {
 const sourceFiles = required.map((file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
 const forbiddenPatterns = [
   /apiSecret\s*:\s*["'][^"']{8,}["']/i,
+  /secretAccessKey\s*:\s*["'][^"']{8,}["']/i,
   /token\s*:\s*["'](?:ghp_|github_pat_)[^"']+["']/i
 ];
 
@@ -37,6 +38,15 @@ if (!mainSource.includes('ipcMain.handle("video:add"')) {
 if (!mainSource.includes('ipcMain.handle("artwork:update"')) {
   throw new Error("Uploader must expose the Manage Posts edit flow.");
 }
+if (!mainSource.includes("PutObjectCommand") || !mainSource.includes("DeleteObjectCommand")) {
+  throw new Error("Uploader must upload and delete R2 objects through the S3-compatible API.");
+}
+if (!mainSource.includes("sharp(") || !mainSource.includes("thumb.webp") || !mainSource.includes("medium.webp") || !mainSource.includes("full.webp")) {
+  throw new Error("Uploader must generate thumb, medium, and full WebP variants.");
+}
+if (mainSource.toLowerCase().includes(["cloud", "inary"].join(""))) {
+  throw new Error("Uploader main process must not use the legacy image host.");
+}
 
 const rendererSource = fs.readFileSync(path.join(__dirname, "renderer", "renderer.js"), "utf8");
 if (!rendererSource.includes("window.galleryUploader.addVideo")) {
@@ -48,8 +58,11 @@ if (!rendererSource.includes("window.galleryUploader.updateArtwork")) {
 if (!rendererSource.includes("filePaths: selectedFiles.map")) {
   throw new Error("Renderer must pass multi-image selections to the upload flow.");
 }
+if (!rendererSource.includes("payload.filePaths = replacementFiles.map")) {
+  throw new Error("Manage Posts must support image replacement.");
+}
 
-if (!mainSource.includes("multiSelections") || !mainSource.includes("entry.pages = pages")) {
+if (!mainSource.includes("multiSelections") || !mainSource.includes("entry.pages = targets.map")) {
   throw new Error("Uploader must support multi-page comic uploads.");
 }
 
