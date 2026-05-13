@@ -61,5 +61,15 @@
     "mediaType": "image",
     "assetPath": "artwork/experimental-woah",
     "featured": false
+  },
+  {
+    "id": "experimental-mirror",
+    "title": "mirror",
+    "gallery": "Experimental",
+    "uploadedAt": "2026-05-13",
+    "alt": "mirror",
+    "mediaType": "image",
+    "assetPath": "artwork/experimental-mirror",
+    "featured": false
   }
 ]
