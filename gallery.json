@@ -29,7 +29,8 @@
     "alt": "deer guy",
     "mediaType": "image",
     "assetPath": "artwork/nsfw-deer-guy",
-    "featured": false
+    "featured": false,
+    "hidden": true
   },
   {
     "id": "main-otter",
