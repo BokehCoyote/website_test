@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-scroll-memory-fix";
+  const ASSET_VERSION = "20260512-click-close";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -371,6 +371,7 @@
     image.addEventListener("error", () => {
       image.replaceWith(createImagePlaceholder("Detail image not found in Cloudinary"));
     }, { once: true });
+    image.addEventListener("click", () => elements.dialog.close());
     fitDetailImageFrame(wrapper, image);
 
     wrapper.append(image);
