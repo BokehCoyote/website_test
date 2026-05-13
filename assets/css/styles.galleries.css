@@ -281,7 +281,9 @@ dl {
 }
 
 .gallery-grid {
-  column-count: 4;
+  width: min(100%, 1080px);
+  margin-inline: auto;
+  column-count: 3;
   column-gap: 0.8rem;
 }
 
@@ -615,12 +617,6 @@ dl {
 
   .dialog-copy h2 {
     font-size: 1.1rem;
-  }
-}
-
-@media (max-width: 1100px) {
-  .gallery-grid {
-    column-count: 3;
   }
 }
 

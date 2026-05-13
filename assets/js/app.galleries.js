@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-lightbox-overflow";
+  const ASSET_VERSION = "20260512-centered-gallery";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
