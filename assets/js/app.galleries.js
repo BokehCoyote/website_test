@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260513-r2-migration";
+  const ASSET_VERSION = "20260513-r2-domain";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
