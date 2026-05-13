@@ -50,5 +50,15 @@
     "mediaType": "image",
     "assetPath": "artwork/nsfw-fox",
     "featured": false
+  },
+  {
+    "id": "experimental-woah",
+    "title": "woah",
+    "gallery": "Experimental",
+    "uploadedAt": "2026-05-13",
+    "alt": "woah",
+    "mediaType": "image",
+    "assetPath": "artwork/experimental-woah",
+    "featured": false
   }
 ]
