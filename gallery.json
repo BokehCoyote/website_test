@@ -40,5 +40,15 @@
     "mediaType": "image",
     "assetPath": "artwork/main-otter",
     "featured": false
+  },
+  {
+    "id": "nsfw-fox",
+    "title": "fox",
+    "gallery": "NSFW",
+    "uploadedAt": "2026-05-13",
+    "alt": "fox",
+    "mediaType": "image",
+    "assetPath": "artwork/nsfw-fox",
+    "featured": false
   }
 ]
