@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-scroll-memory";
+  const ASSET_VERSION = "20260512-scroll-memory-fix";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -21,6 +21,7 @@
     activeArtworkId: null,
     activePageIndex: 0,
     fitResizeHandler: null,
+    scrollRestoreFrames: [],
     galleryScrollPositions: new Map()
   };
 
@@ -50,6 +51,7 @@
   async function init() {
     wireDialog();
     wireNsfwNotice();
+    wireScrollRestoreCancel();
 
     try {
       const data = await fetchGallery();
@@ -554,11 +556,29 @@
 
   function restoreGalleryScroll(galleryKey) {
     const top = state.galleryScrollPositions.get(galleryKey) || 0;
-    requestAnimationFrame(() => {
-      window.scrollTo({ top, behavior: "auto" });
-      setTimeout(() => window.scrollTo({ top, behavior: "auto" }), 250);
-      setTimeout(() => window.scrollTo({ top, behavior: "auto" }), 750);
+    cancelPendingScrollRestore();
+
+    const restore = () => window.scrollTo({ top, behavior: "auto" });
+    const firstFrame = requestAnimationFrame(() => {
+      restore();
+      const secondFrame = requestAnimationFrame(() => {
+        restore();
+        state.scrollRestoreFrames = [];
+      });
+      state.scrollRestoreFrames = [secondFrame];
     });
+    state.scrollRestoreFrames = [firstFrame];
+  }
+
+  function wireScrollRestoreCancel() {
+    ["wheel", "touchstart", "pointerdown", "keydown"].forEach((eventName) => {
+      window.addEventListener(eventName, cancelPendingScrollRestore, { passive: true });
+    });
+  }
+
+  function cancelPendingScrollRestore() {
+    state.scrollRestoreFrames.forEach((frameId) => cancelAnimationFrame(frameId));
+    state.scrollRestoreFrames = [];
   }
 
   function renderError(error) {
