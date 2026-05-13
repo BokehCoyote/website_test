@@ -48,4 +48,6 @@ The website shows the poster or YouTube thumbnail in the gallery and loads the Y
 
 ## Manage Posts
 
-Use Refresh in Manage Posts to load `gallery.json` newest first with image, comic, or video thumbnails. Hide marks an entry with `"hidden": true`, so the public site stops showing it. Restore removes that flag. Cloudinary assets and YouTube videos are left untouched.
+Use Refresh in Manage Posts to load `gallery.json` newest first with image, comic, or video thumbnails. Hide marks an entry with `"hidden": true`, so the public site stops showing it. Restore removes that flag.
+
+Edit changes a post title and its source pointer. For image posts, enter one Cloudinary public ID. For comic posts, enter one Cloudinary public ID per line in page order. For YouTube posts, paste a YouTube URL or raw video ID, plus an optional poster URL. These edits only update `gallery.json`; Cloudinary assets and YouTube videos are left untouched.

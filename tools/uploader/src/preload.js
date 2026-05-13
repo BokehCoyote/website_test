@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld("galleryUploader", {
   uploadArtwork: (payload) => ipcRenderer.invoke("artwork:upload", payload),
   addVideo: (payload) => ipcRenderer.invoke("video:add", payload),
   listArtwork: () => ipcRenderer.invoke("artwork:list"),
-  setArtworkHidden: (payload) => ipcRenderer.invoke("artwork:set-hidden", payload)
+  setArtworkHidden: (payload) => ipcRenderer.invoke("artwork:set-hidden", payload),
+  updateArtwork: (payload) => ipcRenderer.invoke("artwork:update", payload)
 });

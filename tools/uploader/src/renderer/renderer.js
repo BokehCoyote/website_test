@@ -144,6 +144,20 @@ function renderPosts(posts) {
   elements.postList.append(fragment);
 }
 
+function sourceLabel(post) {
+  return post.mediaType === "video" ? "YouTube URL or ID" : "Cloudinary public ID(s)";
+}
+
+function sourceValue(post) {
+  if (post.mediaType === "video") {
+    return post.youtubeId || "";
+  }
+  const ids = Array.isArray(post.cloudinaryPublicIds) && post.cloudinaryPublicIds.length
+    ? post.cloudinaryPublicIds
+    : [post.cloudinaryPublicId].filter(Boolean);
+  return ids.join("\n");
+}
+
 function createPostRow(post) {
   const row = document.createElement("article");
   row.className = `post-row${post.hidden ? " is-hidden" : ""}`;
@@ -185,14 +199,117 @@ function createPostRow(post) {
 
   details.append(title, meta, publicId);
 
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = post.hidden ? "secondary" : "danger";
-  button.textContent = post.hidden ? "Restore" : "Hide";
-  button.addEventListener("click", () => setPostHidden(post.id, !post.hidden, post.title || post.id));
+  const actions = document.createElement("div");
+  actions.className = "post-actions";
 
-  row.append(thumbnail, details, button);
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.className = "secondary";
+  editButton.textContent = "Edit";
+  editButton.addEventListener("click", () => renderPostEditor(row, post));
+
+  const visibilityButton = document.createElement("button");
+  visibilityButton.type = "button";
+  visibilityButton.className = post.hidden ? "secondary" : "danger";
+  visibilityButton.textContent = post.hidden ? "Restore" : "Hide";
+  visibilityButton.addEventListener("click", () => setPostHidden(post.id, !post.hidden, post.title || post.id));
+
+  actions.append(editButton, visibilityButton);
+  row.append(thumbnail, details, actions);
   return row;
+}
+
+function renderPostEditor(row, post) {
+  row.classList.add("is-editing");
+
+  const form = document.createElement("form");
+  form.className = "post-edit-form";
+
+  const titleField = document.createElement("label");
+  titleField.className = "field";
+  const titleLabel = document.createElement("span");
+  titleLabel.textContent = "Title";
+  const titleInput = document.createElement("input");
+  titleInput.name = "title";
+  titleInput.required = true;
+  titleInput.value = post.title || "";
+  titleField.append(titleLabel, titleInput);
+
+  const sourceField = document.createElement("label");
+  sourceField.className = "field";
+  const sourceFieldLabel = document.createElement("span");
+  sourceFieldLabel.textContent = sourceLabel(post);
+  const sourceInput = document.createElement("textarea");
+  sourceInput.name = "source";
+  sourceInput.rows = post.mediaType === "video" ? 2 : Math.max(2, Math.min(Number(post.pageCount) || 1, 5));
+  sourceInput.required = true;
+  sourceInput.value = sourceValue(post);
+  sourceField.append(sourceFieldLabel, sourceInput);
+
+  form.append(titleField, sourceField);
+
+  if (post.mediaType === "video") {
+    const posterField = document.createElement("label");
+    posterField.className = "field";
+    const posterLabel = document.createElement("span");
+    posterLabel.textContent = "Poster URL";
+    const posterInput = document.createElement("input");
+    posterInput.name = "posterUrl";
+    posterInput.placeholder = "optional";
+    posterInput.value = post.posterUrl || "";
+    posterField.append(posterLabel, posterInput);
+    form.append(posterField);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "post-edit-actions";
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "submit";
+  saveButton.className = "primary";
+  saveButton.textContent = "Save";
+
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.className = "secondary";
+  cancelButton.textContent = "Cancel";
+  cancelButton.addEventListener("click", loadPosts);
+
+  actions.append(saveButton, cancelButton);
+  form.append(actions);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+
+    const payload = {
+      id: post.id,
+      updates: {
+        title: titleInput.value.trim()
+      }
+    };
+
+    if (post.mediaType === "video") {
+      payload.updates.youtubeUrl = sourceInput.value.trim();
+      payload.updates.posterUrl = form.elements.posterUrl.value.trim();
+    } else {
+      payload.updates.cloudinaryPublicIds = sourceInput.value;
+    }
+
+    try {
+      const result = await window.galleryUploader.updateArtwork(payload);
+      log(`Updated ${result.item.title}.`, "success");
+      await loadPosts();
+    } catch (error) {
+      log(error.message, "error");
+      saveButton.disabled = false;
+      saveButton.textContent = "Save";
+    }
+  });
+
+  row.replaceChildren(form);
+  titleInput.focus();
 }
 
 async function loadPosts() {

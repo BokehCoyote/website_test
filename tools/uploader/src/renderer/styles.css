@@ -240,7 +240,7 @@ button {
 
 .post-row {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 92px;
+  grid-template-columns: 58px minmax(0, 1fr) 112px;
   align-items: center;
   gap: 12px;
   border: 1px solid var(--line);
@@ -251,6 +251,11 @@ button {
 
 .post-row.is-hidden {
   opacity: 0.62;
+}
+
+.post-row.is-editing {
+  grid-template-columns: 1fr;
+  opacity: 1;
 }
 
 .post-thumb {
@@ -286,6 +291,22 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.post-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.post-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.post-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .danger {

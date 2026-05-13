@@ -220,6 +220,52 @@ function getPageCount(item) {
   return Array.isArray(item.pages) && item.pages.length > 0 ? item.pages.length : 1;
 }
 
+function summarizeArtwork(settings, item) {
+  return {
+    id: item.id,
+    title: item.title || item.id,
+    gallery: item.gallery || "Main",
+    uploadedAt: item.uploadedAt || "",
+    mediaType: item.mediaType || "image",
+    videoProvider: item.videoProvider || "",
+    youtubeId: item.youtubeId || "",
+    cloudinaryPublicId: item.cloudinaryPublicId || "",
+    cloudinaryPublicIds: item.mediaType === "video" ? [] : getEntryPublicIds(item),
+    posterUrl: item.posterUrl || "",
+    pageCount: item.mediaType === "video" ? 1 : getPageCount(item),
+    thumbnailUrl: item.mediaType === "video"
+      ? (item.posterUrl || youtubeThumbnailUrl(item.youtubeId))
+      : cloudinaryDeliveryUrl(settings, getCoverPublicId(item), "f_auto,q_auto,c_fill,w_112,h_112"),
+    hidden: Boolean(item.hidden)
+  };
+}
+
+function normalizeCloudinaryPublicIds(value) {
+  const ids = String(value || "")
+    .split(/\r?\n|,/)
+    .map((item) => item.trim().replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean);
+  return [...new Set(ids)];
+}
+
+function updateImageSource(item, publicIds, title) {
+  if (!publicIds.length) {
+    throw new Error("At least one Cloudinary public ID is required.");
+  }
+
+  const nextItem = { ...item, cloudinaryPublicId: publicIds[0] };
+  if (publicIds.length > 1) {
+    nextItem.pages = publicIds.map((cloudinaryPublicId, index) => ({
+      cloudinaryPublicId,
+      alt: `${title} page ${index + 1}`
+    }));
+  } else {
+    delete nextItem.pages;
+  }
+
+  return nextItem;
+}
+
 function toGalleryEntry(artwork, uploadResults) {
   const uploadedAt = new Date().toISOString().slice(0, 10);
   const results = Array.isArray(uploadResults) ? uploadResults : [uploadResults];
@@ -558,23 +604,7 @@ ipcMain.handle("artwork:list", async () => {
 
   const { gallery } = await fetchGallery(settings);
   return gallery
-    .map((item, index) => ({
-      index,
-      id: item.id,
-      title: item.title || item.id,
-      gallery: item.gallery || "Main",
-      uploadedAt: item.uploadedAt || "",
-      mediaType: item.mediaType || "image",
-      videoProvider: item.videoProvider || "",
-      youtubeId: item.youtubeId || "",
-      cloudinaryPublicId: item.cloudinaryPublicId || "",
-      posterUrl: item.posterUrl || "",
-      pageCount: item.mediaType === "video" ? 1 : getPageCount(item),
-      thumbnailUrl: item.mediaType === "video"
-        ? (item.posterUrl || youtubeThumbnailUrl(item.youtubeId))
-        : cloudinaryDeliveryUrl(settings, getCoverPublicId(item), "f_auto,q_auto,c_fill,w_112,h_112"),
-      hidden: Boolean(item.hidden)
-    }))
+    .map((item, index) => ({ index, ...summarizeArtwork(settings, item) }))
     .sort(newestFirst)
     .map(({ index, ...item }) => item);
 });
@@ -612,22 +642,75 @@ ipcMain.handle("artwork:set-hidden", async (_event, payload) => {
   const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `${action} ${item.title || id}`);
 
   return {
-    item: {
-      id: nextItem.id,
-      title: nextItem.title || nextItem.id,
-      gallery: nextItem.gallery || "Main",
-      uploadedAt: nextItem.uploadedAt || "",
-      mediaType: nextItem.mediaType || "image",
-      videoProvider: nextItem.videoProvider || "",
-      youtubeId: nextItem.youtubeId || "",
-      cloudinaryPublicId: nextItem.cloudinaryPublicId || "",
-      posterUrl: nextItem.posterUrl || "",
-      pageCount: nextItem.mediaType === "video" ? 1 : getPageCount(nextItem),
-      thumbnailUrl: nextItem.mediaType === "video"
-        ? (nextItem.posterUrl || youtubeThumbnailUrl(nextItem.youtubeId))
-        : cloudinaryDeliveryUrl(settings, getCoverPublicId(nextItem), "f_auto,q_auto,c_fill,w_112,h_112"),
-      hidden: Boolean(nextItem.hidden)
-    },
+    item: summarizeArtwork(settings, nextItem),
+    github: {
+      commitSha: commit.commit?.sha,
+      htmlUrl: commit.commit?.html_url || commit.content?.html_url
+    }
+  };
+});
+
+ipcMain.handle("artwork:update", async (_event, payload) => {
+  const settings = await readSettings();
+  const id = payload?.id;
+  const updates = payload?.updates || {};
+
+  requireValue(id, "Artwork ID");
+  requireValue(settings.github.owner, "GitHub owner");
+  requireValue(settings.github.repo, "GitHub repo");
+  requireValue(settings.github.branch, "GitHub branch");
+  requireValue(settings.github.galleryPath, "GitHub gallery path");
+  requireValue(settings.github.token, "GitHub token");
+
+  const { file, gallery, encodedPath } = await fetchGallery(settings);
+  const index = gallery.findIndex((item) => item.id === id);
+
+  if (index === -1) {
+    throw new Error(`gallery.json does not contain id "${id}".`);
+  }
+
+  const item = gallery[index];
+  const title = String(updates.title || "").trim();
+  requireValue(title, "Title");
+
+  let nextItem = { ...item, title };
+
+  if (item.mediaType === "video") {
+    const youtubeId = parseYouTubeId(updates.youtubeUrl || updates.youtubeId || item.youtubeId);
+    if (!youtubeId) {
+      throw new Error("Enter a valid YouTube URL or 11-character video ID.");
+    }
+    const duplicateVideo = gallery.some((entry, entryIndex) => (
+      entryIndex !== index
+      && entry.mediaType === "video"
+      && entry.videoProvider === "youtube"
+      && entry.youtubeId === youtubeId
+    ));
+    if (duplicateVideo) {
+      throw new Error(`gallery.json already contains YouTube video "${youtubeId}".`);
+    }
+    nextItem.youtubeId = youtubeId;
+    nextItem.posterUrl = String(updates.posterUrl || "").trim();
+    nextItem.videoProvider = "youtube";
+  } else {
+    const publicIds = normalizeCloudinaryPublicIds(updates.cloudinaryPublicIds || updates.cloudinaryPublicId);
+    const existingIds = gallery.flatMap((entry, entryIndex) => (entryIndex === index ? [] : getEntryPublicIds(entry)));
+    const duplicatePublicId = publicIds.find((publicId) => existingIds.includes(publicId));
+    if (duplicatePublicId) {
+      throw new Error(`gallery.json already contains public ID "${duplicatePublicId}".`);
+    }
+    nextItem = updateImageSource(nextItem, publicIds, title);
+  }
+
+  if (!nextItem.alt || nextItem.alt === item.title) {
+    nextItem.alt = title;
+  }
+
+  const nextGallery = gallery.map((entry, entryIndex) => (entryIndex === index ? nextItem : entry));
+  const commit = await commitGallery(settings, encodedPath, file.sha, nextGallery, `Update ${title}`);
+
+  return {
+    item: summarizeArtwork(settings, nextItem),
     github: {
       commitSha: commit.commit?.sha,
       htmlUrl: commit.commit?.html_url || commit.content?.html_url
