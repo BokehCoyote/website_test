@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-scrolltop";
+  const ASSET_VERSION = "20260512-scroll-memory";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -20,7 +20,8 @@
     nsfwAccepted: false,
     activeArtworkId: null,
     activePageIndex: 0,
-    fitResizeHandler: null
+    fitResizeHandler: null,
+    galleryScrollPositions: new Map()
   };
 
   const elements = {
@@ -191,10 +192,14 @@
 
     button.addEventListener("click", () => {
       const changed = state[filterName] !== value;
+      const previousValue = state[filterName];
+      if (changed && filterName === "gallery") {
+        saveGalleryScroll(previousValue);
+      }
       state[filterName] = value;
       renderAll();
       if (changed) {
-        scrollToGalleryTop();
+        restoreGalleryScroll(value);
       }
     });
     return button;
@@ -531,21 +536,28 @@
     elements.nsfwAccept.addEventListener("click", () => {
       state.nsfwAccepted = true;
       renderAll();
-      scrollToGalleryTop();
+      restoreGalleryScroll(state.gallery);
     });
     elements.nsfwBack.addEventListener("click", () => {
+      saveGalleryScroll(state.gallery);
       state.gallery = DEFAULT_GALLERY;
       renderAll();
-      scrollToGalleryTop();
+      restoreGalleryScroll(DEFAULT_GALLERY);
     });
   }
 
-  function scrollToGalleryTop() {
+  function saveGalleryScroll(galleryKey) {
+    if (galleryKey) {
+      state.galleryScrollPositions.set(galleryKey, window.scrollY);
+    }
+  }
+
+  function restoreGalleryScroll(galleryKey) {
+    const top = state.galleryScrollPositions.get(galleryKey) || 0;
     requestAnimationFrame(() => {
-      window.scrollTo({
-        top: 0,
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
-      });
+      window.scrollTo({ top, behavior: "auto" });
+      setTimeout(() => window.scrollTo({ top, behavior: "auto" }), 250);
+      setTimeout(() => window.scrollTo({ top, behavior: "auto" }), 750);
     });
   }
 
