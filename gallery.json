@@ -20,5 +20,15 @@
     "mediaType": "image",
     "assetPath": "artwork/main-hotchkisstank-iz-planeta-5",
     "featured": false
+  },
+  {
+    "id": "nsfw-deer-guy",
+    "title": "deer guy",
+    "gallery": "NSFW",
+    "uploadedAt": "2026-05-13",
+    "alt": "deer guy",
+    "mediaType": "image",
+    "assetPath": "artwork/nsfw-deer-guy",
+    "featured": false
   }
 ]
