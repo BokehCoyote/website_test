@@ -1,5 +1,5 @@
 (function () {
-  const ASSET_VERSION = "20260512-click-close";
+  const ASSET_VERSION = "20260512-stable-lightbox-fit";
   const DEFAULT_GALLERY = "main";
   const NSFW_GALLERY = "nsfw";
   const GALLERY_OPTIONS = [
@@ -20,7 +20,6 @@
     nsfwAccepted: false,
     activeArtworkId: null,
     activePageIndex: 0,
-    fitResizeHandler: null,
     scrollRestoreFrames: [],
     galleryScrollPositions: new Map()
   };
@@ -322,7 +321,6 @@
   }
 
   function renderDialogMedia(artwork) {
-    clearDetailFit();
     const media = createDetailMedia(artwork);
     elements.dialogMedia.replaceChildren(media);
 
@@ -372,8 +370,6 @@
       image.replaceWith(createImagePlaceholder("Detail image not found in Cloudinary"));
     }, { once: true });
     image.addEventListener("click", () => elements.dialog.close());
-    fitDetailImageFrame(wrapper, image);
-
     wrapper.append(image);
 
     return wrapper;
@@ -455,53 +451,6 @@
     return svg;
   }
 
-  function fitDetailImageFrame(wrapper, image) {
-    const applyFit = () => {
-      if (!elements.dialog.open || !image.naturalWidth || !image.naturalHeight) {
-        return;
-      }
-
-      const dialogStyles = getComputedStyle(elements.dialog);
-      const layoutStyles = getComputedStyle(elements.dialog.querySelector(".dialog-layout"));
-      const verticalPadding = parseFloat(dialogStyles.paddingTop) + parseFloat(dialogStyles.paddingBottom);
-      const layoutGap = parseFloat(layoutStyles.rowGap || layoutStyles.gap) || 0;
-      const copyHeight = elements.dialog.querySelector(".dialog-copy").getBoundingClientRect().height || 34;
-      const maxWidth = elements.dialogMedia.clientWidth;
-      const maxHeight = Math.max(180, window.innerHeight - verticalPadding - layoutGap - copyHeight);
-
-      let width = maxWidth;
-      let height = width * (image.naturalHeight / image.naturalWidth);
-
-      if (height > maxHeight) {
-        height = maxHeight;
-        width = height * (image.naturalWidth / image.naturalHeight);
-      }
-
-      wrapper.style.width = `${Math.max(1, Math.floor(width))}px`;
-      wrapper.style.height = `${Math.max(1, Math.floor(height))}px`;
-    };
-
-    const scheduleFit = () => requestAnimationFrame(applyFit);
-
-    if (image.complete && image.naturalWidth) {
-      scheduleFit();
-    } else {
-      image.addEventListener("load", scheduleFit, { once: true });
-    }
-
-    clearDetailFit();
-    state.fitResizeHandler = scheduleFit;
-    window.addEventListener("resize", state.fitResizeHandler);
-    requestAnimationFrame(scheduleFit);
-  }
-
-  function clearDetailFit() {
-    if (state.fitResizeHandler) {
-      window.removeEventListener("resize", state.fitResizeHandler);
-      state.fitResizeHandler = null;
-    }
-  }
-
   function createImagePlaceholder(message) {
     const placeholder = document.createElement("div");
     placeholder.className = "image-placeholder";
@@ -524,7 +473,6 @@
       }
     });
     elements.dialog.addEventListener("close", () => {
-      clearDetailFit();
       elements.dialogMedia.replaceChildren();
       elements.lightboxNav.replaceChildren();
       elements.lightboxNav.hidden = true;
